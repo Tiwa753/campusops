@@ -21,13 +21,16 @@ const labels: Record<string, string> = {
   medium: "Medium",
   low: "Low",
   event: "Event",
+  conference: "Conference",
   program: "Program",
+  hackathon: "Hackathon",
+  other: "Other",
 };
-export function Badge({ value }: { value: string }) {
+export function Badge({ value, label }: { value: string; label?: string }) {
   return (
     <span className={`badge badge-${value}`}>
       <span className="status-dot" />
-      {labels[value] ?? value}
+      {label ?? labels[value] ?? value}
     </span>
   );
 }

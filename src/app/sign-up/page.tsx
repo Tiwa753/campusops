@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Signup from "@/components/signup";
+import AuthPanel from "@/components/auth-panel";
 
-export const metadata: Metadata = { title: "Join your campus · CampusOps" };
+export const metadata: Metadata = { title: "Create an account · CampusOps" };
 export default function SignupPage() {
-  return <Signup />;
+  return <AuthPanel mode="signup" />;
 }

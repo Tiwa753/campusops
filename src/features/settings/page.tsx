@@ -1,16 +1,43 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCampus } from "@/components/campus-provider";
 import Icon from "@/components/icon";
 import { useState } from "react";
-import Link from "next/link";
 import { Badge, Modal, PageHeader, PanelHeader } from "@/components/ui";
 import { initials } from "@/lib/domain";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { profile, account, context, university, accessLabel, data, reset } =
     useCampus();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError("");
+    try {
+      const response = await fetch("/api/auth/sign-out", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!response.ok) {
+        const result = (await response.json()) as { error?: string };
+        setSignOutError(result.error ?? "Unable to end your session.");
+        return;
+      }
+      router.replace("/");
+      router.refresh();
+    } catch {
+      setSignOutError("Couldn’t reach the authentication service. Try again.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
   return (
     <>
       <PageHeader
@@ -83,6 +110,26 @@ export default function SettingsPage() {
           ))}
       </section>
       <section className="panel settings-panel">
+        <PanelHeader
+          title="Session"
+          description="End your CampusOps session on this device."
+        />
+        <div className="settings-description">
+          <button
+            className="button button-secondary"
+            onClick={signOut}
+            disabled={signingOut}
+          >
+            {signingOut ? "Logging out…" : "Log out"}
+          </button>
+          {signOutError && (
+            <p className="form-error" role="alert">
+              {signOutError}
+            </p>
+          )}
+        </div>
+      </section>
+      <section className="panel settings-panel">
         <PanelHeader title="How access works" />
         <div className="table-scroll">
           <table className="permissions-table">
@@ -142,10 +189,6 @@ export default function SettingsPage() {
             authentication, membership verification, and a shared database will
             be connected in the next implementation stage.
           </p>
-          <Link href="/sign-up" className="button button-secondary">
-            Preview the signup journey
-            <Icon name="arrow" size={15} />
-          </Link>
           <div className="reset-row">
             <div>
               <strong>Reset local sample data</strong>

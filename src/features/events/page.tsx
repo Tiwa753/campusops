@@ -22,7 +22,7 @@ export default function EventsPage() {
               eventStartTime(event) > new Date().getTime()
             : event.status === tab)) &&
         (kind === "all" || event.kind === kind) &&
-        `${event.title} ${event.location} ${scoped.organizations.find((org) => org.id === event.organizationId)?.name}`
+        `${event.title} ${event.location} ${event.customKind ?? ""} ${scoped.organizations.find((org) => org.id === event.organizationId)?.name}`
           .toLowerCase()
           .includes(search.toLowerCase()),
     )
@@ -85,8 +85,11 @@ export default function EventsPage() {
             onChange={(event) => setKind(event.target.value)}
           >
             <option value="all">All types</option>
+            <option value="conference">Conferences</option>
             <option value="event">Events</option>
             <option value="program">Programs</option>
+            <option value="hackathon">Hackathons</option>
+            <option value="other">Other</option>
           </select>
         </div>
         <EventsTable events={events} />

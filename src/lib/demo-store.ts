@@ -101,6 +101,18 @@ function readStored(raw: string | null): Snapshot {
       ],
       ["capacity", "attendance"],
     ) ||
+    !(data.events as Record<string, unknown>[]).every(
+      (event) =>
+        ["conference", "event", "program", "hackathon", "other"].includes(
+          String(event.kind),
+        ) &&
+        (event.customKind === undefined ||
+          typeof event.customKind === "string") &&
+        (event.kind !== "other" ||
+          (typeof event.customKind === "string" &&
+            event.customKind.trim().length > 0 &&
+            event.customKind.length <= 40)),
+    ) ||
     !records(data.tasks, [
       "id",
       "universityId",
@@ -272,20 +284,29 @@ function commit(next: Snapshot) {
   }
   emit();
 }
-async function execute(command: Command) {
+async function execute(
+  command: Command,
+  account = snapshot?.account,
+  context = snapshot?.context,
+) {
   if (!snapshot) throw new Error("Workspace is loading.");
+  if (!account || !context) throw new Error("Workspace access is unavailable.");
   commit({
     ...snapshot,
     data: applyCommand(
       snapshot.data,
-      resolveProfile(snapshot.account, snapshot.context),
+      resolveProfile(account, context),
       command,
     ),
   });
 }
-async function selectContext(context: WorkspaceContext) {
+async function selectContext(
+  context: WorkspaceContext,
+  account = snapshot?.account,
+) {
   if (!snapshot) throw new Error("Workspace is loading.");
-  resolveProfile(snapshot.account, context);
+  if (!account) throw new Error("Workspace access is unavailable.");
+  resolveProfile(account, context);
   commit({ ...snapshot, context });
 }
 async function prepareOnboarding(input: SignupInput) {

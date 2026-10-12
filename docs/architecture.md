@@ -41,7 +41,7 @@ Personal and management navigation is deliberately separate to prevent mixing an
 4. Grant management access only after that separate verification. Keep the existing student identity and personal history.
 5. University administrators are provisioned through trusted invitations. Public signup never offers an admin option or accepts a caller-supplied role.
 
-The `/sign-up` screen currently **previews** these steps. It collects no password, sends no email, creates no account, and grants no access. Its result is ephemeral and cleared on reload. Account verification and invitation processing are intentionally deferred until a backend is selected.
+`/sign-up` now creates a Supabase Auth account with a password and requires email confirmation. The database trigger creates a student profile regardless of submitted metadata; it never grants a leadership or administrator role. Trusted administrators must provision organization-manager memberships and administrator profiles outside public signup. Password recovery and reset use one-time Supabase links exchanged for server-side sessions.
 
 ## Boundaries in the implementation
 
@@ -77,7 +77,7 @@ Universities define their name, country, locale, and IANA timezone. OAU uses `Af
 
 ## Security boundary and backend connection
 
-**Current status:** a local product preview, not an authenticated production system. Browser storage is editable and the sample account is preprovisioned. The policy tests verify intended rules; they do not turn browser storage into a security boundary. The v1 demo migration preserves records but discards its editable role selection.
+**Current status:** Supabase Auth and server route access checks are implemented, but operational workspace data remains a local product preview. Browser storage is editable and the sample account is preprovisioned. Do not put real student information in this preview. The policy tests verify intended rules; they do not turn browser storage into a security boundary. boundary. The v1 demo migration preserves records but discards its editable role selection.
 
 The production adapter must use a real identity provider and a server data-access layer. Server mutations must load fresh memberships, validate input, check tenant and ownership, enforce CSRF protection where applicable, and write an audit record. Protect sessions with appropriate secure cookie settings. Invitations require expiration, single use, recipient binding, and privileged issuance. Revocation must take effect on subsequent requests. Add rate limits, operational logs without secrets, recovery processes, and deployment-specific security headers once the backend and hosting environment are chosen.
 
@@ -95,4 +95,4 @@ Before launch, test representative devices and constrained network profiles, use
 
 ## Next backend increment
 
-Connect session authentication and verification first, then implement the adapter with university-scoped server queries and database access rules. Next add invitation/leadership approval, transactional application review, and audit storage. Finally validate cross-tenant isolation against the real database, session revocation, backup recovery, accessibility, and mobile-network performance before onboarding real student records.
+The initial session/authentication layer uses Supabase SSR cookies, server session verification, protected route layouts, and database-backed role checks. Next implement the operational data adapter with university-scoped server queries and database access rules. Then add invitation/leadership approval, transactional application review, and audit storage. Finally validate cross-tenant isolation against the real database, session revocation, backup recovery, accessibility, and mobile-network performance before onboarding real student records.

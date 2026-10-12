@@ -26,7 +26,8 @@ export type CampusEvent = {
   universityId: string;
   title: string;
   organizationId: string;
-  kind: "event" | "program";
+  kind: "conference" | "event" | "program" | "hackathon" | "other";
+  customKind?: string;
   description: string;
   date: string;
   time: string;
@@ -90,6 +91,13 @@ export function dateOffset(days: number, now = new Date()) {
 
 export function eventStartTime(event: CampusEvent) {
   return campusInstant(event.date, event.time, event.timeZone);
+}
+
+export function eventKindLabel(
+  event: Pick<CampusEvent, "kind" | "customKind">,
+) {
+  if (event.kind === "other") return event.customKind?.trim() || "Other";
+  return event.kind[0].toUpperCase() + event.kind.slice(1);
 }
 
 export function canManageOrganization(
@@ -301,9 +309,13 @@ export function applyCommand(
     );
     requireCondition(
       ["published", "draft", "completed", "cancelled"].includes(event.status) &&
-        ["event", "program"].includes(event.kind),
+        ["conference", "event", "program", "hackathon", "other"].includes(
+          event.kind,
+        ),
       "Invalid event type or status.",
     );
+    if (event.kind === "other")
+      required(event.customKind ?? "", "Custom event type", 40);
     requireCondition(
       Number.isInteger(event.capacity) &&
         event.capacity > 0 &&

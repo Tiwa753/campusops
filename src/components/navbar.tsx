@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCampus } from "./campus-provider";
 import Icon from "./icon";
 import { Modal, SearchInput, EmptyState } from "./ui";
+import { eventKindLabel } from "@/lib/domain";
 
 const names: Record<string, string> = {
   "/": "Overview",
@@ -32,7 +33,7 @@ export default function Navbar({
     ...scoped.events.map((event) => ({
       id: event.id,
       title: event.title,
-      group: event.kind === "program" ? "Program" : "Event",
+      group: eventKindLabel(event),
       type: "event-detail" as const,
     })),
     ...scoped.organizations.map((org) => ({

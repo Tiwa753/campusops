@@ -6,6 +6,7 @@ import {
   approvedCount,
   canApply,
   exportCsv,
+  eventKindLabel,
   selectWorkspace,
 } from "../src/lib/domain.ts";
 
@@ -61,6 +62,45 @@ test("managers cannot edit or take ownership of another organization's events", 
         now,
       ),
     /permission/,
+  );
+});
+test("opportunities support standard and custom types", () => {
+  const state = seed();
+  const event = state.events.find((item) => item.organizationId === "org-tech");
+  for (const kind of ["conference", "event", "program", "hackathon"]) {
+    const updated = applyCommand(
+      state,
+      profiles.manager,
+      { type: "save-event", event: { ...event, kind } },
+      now,
+    );
+    assert.equal(updated.events.find((item) => item.id === event.id).kind, kind);
+  }
+  const custom = {
+    ...event,
+    kind: "other",
+    customKind: "Career fair",
+  };
+  const updated = applyCommand(
+    state,
+    profiles.manager,
+    { type: "save-event", event: custom },
+    now,
+  );
+  assert.equal(eventKindLabel(custom), "Career fair");
+  assert.equal(
+    updated.events.find((item) => item.id === event.id).customKind,
+    "Career fair",
+  );
+  assert.throws(
+    () =>
+      applyCommand(
+        state,
+        profiles.manager,
+        { type: "save-event", event: { ...custom, customKind: " " } },
+        now,
+      ),
+    /Custom event type/,
   );
 });
 test("manager organization changes are scoped and status changes require admin", () => {

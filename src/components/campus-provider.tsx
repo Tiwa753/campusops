@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import {
   selectWorkspace,
   type Workspace,
@@ -79,18 +80,81 @@ export default function CampusProvider({
     adapter.getSnapshot,
     adapter.getServerSnapshot,
   );
+  const router = useRouter();
+  const [authenticatedAccount, setAuthenticatedAccount] =
+    useState<Account | null>(null);
+  const [authError, setAuthError] = useState("");
+  const [authReady, setAuthReady] = useState(false);
+  const [authRetry, setAuthRetry] = useState(0);
   const [dialog, openDialog] = useState<DialogState>(null);
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const mutationInFlight = useRef(false);
   useEffect(() => {
+    let active = true;
+    async function loadAccount() {
+      setAuthReady(false);
+      setAuthError("");
+      try {
+        const response = await fetch("/api/auth/account", {
+          cache: "no-store",
+        });
+        const result = (await response.json()) as {
+          account?: Account;
+          error?: string;
+        };
+        if (response.status === 401) {
+          router.replace(
+            `/sign-in?next=${encodeURIComponent(window.location.pathname)}`,
+          );
+          return;
+        }
+        if (!response.ok || !result.account) {
+          throw new Error(result.error ?? "Unable to load your account.");
+        }
+        if (active) setAuthenticatedAccount(result.account);
+      } catch (error) {
+        if (active) {
+          setAuthError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load your account. Please try again.",
+          );
+        }
+      } finally {
+        if (active) setAuthReady(true);
+      }
+    }
+    void loadAccount();
+    return () => {
+      active = false;
+    };
+  }, [authRetry, router]);
+  useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(""), 5000);
       return () => clearTimeout(timer);
     }
   }, [toast]);
-  if (!snapshot)
+  if (authError) {
+    return (
+      <div className="workspace-loading" role="alert">
+        <span className="brand-mark">
+          <Icon name="building" size={26} />
+        </span>
+        <strong>CampusOps</strong>
+        <span>{authError}</span>
+        <button
+          className="button button-secondary"
+          onClick={() => setAuthRetry((retry) => retry + 1)}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+  if (!snapshot || !authReady || !authenticatedAccount)
     return (
       <div className="workspace-loading">
         <span className="brand-mark">
@@ -100,18 +164,36 @@ export default function CampusProvider({
         <span>Getting your campus ready…</span>
       </div>
     );
-  const profile = resolveProfile(snapshot.account, snapshot.context);
+  const account = authenticatedAccount;
+  const contexts = availableContexts(account);
+  const context =
+    contexts.find(
+      (item) =>
+        item.universityId === snapshot.context.universityId &&
+        item.kind === snapshot.context.kind &&
+        (item.kind !== "organization" ||
+          (snapshot.context.kind === "organization" &&
+            item.organizationId === snapshot.context.organizationId)),
+    ) ?? contexts[0];
+  if (!context) {
+    return (
+      <div className="workspace-loading" role="alert">
+        <strong>Your account has no active campus workspace.</strong>
+      </div>
+    );
+  }
+  const profile = resolveProfile(account, context);
   const university =
-    universities.find((item) => item.id === snapshot.context.universityId) ??
+    universities.find((item) => item.id === context.universityId) ??
     universities[0];
   const value: ContextValue = {
     data: snapshot.data,
     profile,
-    account: snapshot.account,
+    account,
     university,
-    context: snapshot.context,
-    contexts: availableContexts(snapshot.account),
-    accessLabel: accountLabel(snapshot.account, snapshot.context.universityId),
+    context,
+    contexts,
+    accessLabel: accountLabel(account, context.universityId),
     prepareOnboarding: (input) => adapter.prepareOnboarding(input),
     scoped: selectWorkspace(snapshot.data, profile),
     dialog,
@@ -127,7 +209,7 @@ export default function CampusProvider({
         return false;
       }
       try {
-        await adapter.selectContext(context);
+        await adapter.selectContext(context, account);
         openDialog(null);
         setError("");
         return true;
@@ -143,7 +225,7 @@ export default function CampusProvider({
       mutationInFlight.current = true;
       setPending(true);
       try {
-        await adapter.execute(command);
+        await adapter.execute(command, account, context);
         setError("");
         setToast(message);
         return true;

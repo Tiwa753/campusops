@@ -1,6 +1,6 @@
 ﻿# CampusOps
 
-CampusOps is a university operations application beginning with an OAU product preview in Nigeria. It connects student organizations, events, programs, tasks, applications, and analytics. The current implementation prepares the interface and domain architecture for a backend; it is not a live authentication system.
+CampusOps is a university operations application beginning with an OAU product preview in Nigeria. It connects student organizations, events, programs, tasks, applications, and analytics. Supabase Auth provides account registration, email confirmation, sign-in, password recovery, and server-verified sessions. Operational workspace records remain sample preview data and are not a production data backend.
 
 ## Run
 
@@ -11,7 +11,18 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). Account setup is at [/sign-up](http://localhost:3000/sign-up).
+Copy `.env.example` to `.env.local`, configure the Supabase project values, and run the database migration before starting the app:
+
+```bash
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase db push
+npm run dev
+```
+
+Open [localhost:3000](http://localhost:3000). Register at [/sign-up](http://localhost:3000/sign-up), or sign in at [/sign-in](http://localhost:3000/sign-in).
+
+In Supabase Auth settings, enable email confirmation and add `http://localhost:3000/auth/callback` to the allowed redirect URLs. For each deployment, set `NEXT_PUBLIC_SITE_URL` to that exact HTTPS origin and allow its `/auth/callback` URL in Supabase. Only use the `sb_publishable_...` key in `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; never put a secret/service-role key in a `NEXT_PUBLIC_` variable.
 
 ## One account, personal and organization workspaces
 
@@ -25,13 +36,25 @@ The preview starts as **Damilola Adeyemi**, an OAU student who also leads **Tech
 
 To try it, apply to **A Greener Campus** in My campus, open your applications, then visit the club management space. The personal application remains yours and does not appear in that unrelated club's review queue. You can review other students' Tech & Innovation Club applications from the management space.
 
-## Signup and permissions
+## Authentication and permissions
 
-The signup page collects a university and an intention to participate or lead. The domain creates a **pending** student membership and, where requested, a separate **pending** leadership request. Verification and authorized approval are prerequisites for access.
+The registration page creates an account with a password and a default student profile. Supabase email confirmation is required before authenticated workspace routes can be opened. Sign-in, sign-out, password recovery, and password reset use same-origin server route handlers. Supabase SSR stores session cookies as HttpOnly, SameSite=Lax cookies (Secure in production); passwords and tokens are not stored in local storage or sent to client code.
 
-This is a signup **preview**: no password is collected, no account is created, no email is sent, and no access is granted. Submitted details remain in memory only. Real signup, sign-in, email verification, invitations, and approval persistence will be implemented when a backend is connected.
+`src/app/(workspace)/layout.tsx` verifies the session server-side. The admin page checks the signed-in user's database profile; tasks and analytics require an active organization-manager membership. The profile trigger always creates a student profile and ignores submitted role metadata. Profile and organization-membership RLS allows users to read only their own rows, with no client-side permission to grant roles.
 
-The browser adapter uses a preprovisioned sample account. Its local membership data is editable in browser tools and is **not a production security boundary**. No real student information belongs in the preview.
+To provision an administrator, first create and verify their account, then run a trusted SQL update in the Supabase SQL editor:
+
+```sql
+update public.profiles
+set role = 'admin'
+where id = (
+  select id from auth.users where email = 'admin@example.edu'
+);
+```
+
+An active organization-manager membership must likewise be issued through a trusted administrative workflow. Public signup never grants manager or administrator access. The existing UI data adapter is still the explicitly labelled local sample preview; this authentication change does not migrate events, applications, or student data into Supabase. Do not put real student information in the preview.
+
+The workspace UI still uses a preprovisioned sample account. Its local membership data is editable in browser tools and is **not a production authorization boundary**; server route checks rely on Supabase profiles and memberships instead. No real student information belongs in the preview.
 
 ## Architecture
 

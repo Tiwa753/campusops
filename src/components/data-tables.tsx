@@ -6,6 +6,7 @@ import Icon from "./icon";
 import {
   approvedCount,
   dateOffset,
+  eventKindLabel,
   formatDate,
   initials,
   type Application,
@@ -69,7 +70,8 @@ export function EventsTable({
                       </button>
                       <span className="row-subtitle">
                         {org?.name}
-                        {event.kind === "program" && " · Program"}
+                        {event.kind !== "event" &&
+                          ` · ${eventKindLabel(event)}`}
                       </span>
                     </div>
                   </div>

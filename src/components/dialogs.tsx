@@ -9,6 +9,7 @@ import {
   canApply,
   canManageOrganization,
   dateOffset,
+  eventKindLabel,
   formatDate,
   initials,
   type CampusEvent,
@@ -77,6 +78,10 @@ function EventForm({ id }: { id?: string }) {
   const [status, setStatus] = useState<CampusEvent["status"]>(
     existing?.status ?? "published",
   );
+  const [kind, setKind] = useState<CampusEvent["kind"]>(
+    existing?.kind ?? "event",
+  );
+  const [customKind, setCustomKind] = useState(existing?.customKind ?? "");
   if (
     profile.role === "student" ||
     (existing && !canManageOrganization(profile, existing.organizationId))
@@ -91,7 +96,8 @@ function EventForm({ id }: { id?: string }) {
       universityId: profile.universityId,
       title: value("title"),
       organizationId: existing?.organizationId ?? value("organizationId"),
-      kind: value("kind") as CampusEvent["kind"],
+      kind,
+      customKind: kind === "other" ? value("customKind") : undefined,
       description: value("description"),
       date: value("date"),
       time: value("time"),
@@ -112,7 +118,6 @@ function EventForm({ id }: { id?: string }) {
   return (
     <Modal
       title={existing ? "Edit opportunity" : "Create an opportunity"}
-      description="Bring your campus together around something good."
       onClose={() => openDialog(null)}
     >
       <form onSubmit={submit}>
@@ -131,11 +136,32 @@ function EventForm({ id }: { id?: string }) {
             disabled={!!existing}
           />
           <Field label="Type">
-            <select name="kind" defaultValue={existing?.kind ?? "event"}>
+            <select
+              name="kind"
+              value={kind}
+              onChange={(event) =>
+                setKind(event.target.value as CampusEvent["kind"])
+              }
+            >
+              <option value="conference">Conference</option>
               <option value="event">Event</option>
               <option value="program">Program</option>
+              <option value="hackathon">Hackathon</option>
+              <option value="other">Other</option>
             </select>
           </Field>
+          {kind === "other" && (
+            <Field label="Custom type" wide>
+              <input
+                name="customKind"
+                value={customKind}
+                onChange={(event) => setCustomKind(event.target.value)}
+                placeholder="Enter an opportunity type"
+                maxLength={40}
+                required
+              />
+            </Field>
+          )}
           <Field label="Description" wide>
             <textarea
               name="description"
@@ -444,7 +470,7 @@ function EventDetail({ id }: { id?: string }) {
     >
       <div className="modal-body">
         <div className="detail-badges">
-          <Badge value={event.kind} />
+          <Badge value={event.kind} label={eventKindLabel(event)} />
           <Badge value={event.status} />
         </div>
         <p className="detail-description">{event.description}</p>
@@ -561,7 +587,7 @@ function OrganizationDetail({ id }: { id?: string }) {
                 <div>
                   <strong>{event.title}</strong>
                   <span>
-                    {formatDate(event.date)} · {event.kind}
+                    {formatDate(event.date)} · {eventKindLabel(event)}
                   </span>
                 </div>
                 <Icon name="arrow" size={16} />

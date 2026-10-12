@@ -167,9 +167,6 @@ export default function Sidebar({ close }: { close: () => void }) {
             Sample data. Your personal activity stays yours when you manage a
             club.
           </span>
-          <Link href="/sign-up" onClick={close} className="preview-signup-link">
-            Preview account setup <Icon name="arrow" size={13} />
-          </Link>
         </div>
         <Link
           href="/settings"

@@ -25,8 +25,12 @@ export interface WorkspaceAdapter {
   subscribe(listener: () => void): () => void;
   getSnapshot(): WorkspaceSnapshot | null;
   getServerSnapshot(): WorkspaceSnapshot | null;
-  execute(command: Command): Promise<void>;
-  selectContext(context: WorkspaceContext): Promise<void>;
+  execute(
+    command: Command,
+    account?: Account,
+    context?: WorkspaceContext,
+  ): Promise<void>;
+  selectContext(context: WorkspaceContext, account?: Account): Promise<void>;
   prepareOnboarding(input: SignupInput): Promise<OnboardingDraft>;
   resetPreview(): Promise<void>;
 }
