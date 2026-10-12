@@ -1,3 +1,1 @@
-export default function OrganizationsPage() {
-    return <h1>Organizations</h1>;
-}
+export { OrganizationsPage as default } from "@/components/workspace-pages";

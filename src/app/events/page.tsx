@@ -1,3 +1,1 @@
-export default function EventsPage() {
-    return <h1>Events</h1>;
-}
+export { EventsPage as default } from "@/components/workspace-pages";

@@ -1,3 +1,1 @@
-export default function ApplicationsPage() {
-    return <h1>Applications</h1>;
-}
+export { ApplicationsPage as default } from "@/components/workspace-pages";

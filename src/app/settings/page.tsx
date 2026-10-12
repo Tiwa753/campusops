@@ -1,3 +1,1 @@
-export default function SettingsPage() {
-    return <h1>Settings</h1>;
-}
+export { SettingsPage as default } from "@/components/workspace-pages";
