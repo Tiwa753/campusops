@@ -1,24 +1,98 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { writeFile } from "node:fs/promises";
+import { createSeed } from "../../src/lib/preview/seed";
+import { performanceBudgets } from "../../src/lib/performance";
 
-test("student application, manager approval, persistence, and withdrawal", async ({
+const managerButton = (page: Page) =>
+  page.getByRole("button", {
+    name: "Manage Tech & Innovation Club",
+    exact: true,
+  });
+const personalButton = (page: Page) =>
+  page.getByRole("button", { name: "My campus", exact: true });
+
+async function installAdminFixture(page: Page) {
+  await page.addInitScript((data) => {
+    if (!localStorage.getItem("campusops-preview-v2"))
+      localStorage.setItem(
+        "campusops-preview-v2",
+        JSON.stringify({
+          mode: "preview",
+          data,
+          account: {
+            identity: {
+              id: "user-admin",
+              name: "University Admin",
+              email: "admin@example.test",
+            },
+            universityMemberships: [
+              { universityId: "oau", role: "administrator", status: "active" },
+            ],
+            organizationMemberships: [],
+          },
+        }),
+      );
+  }, createSeed());
+}
+
+test("leadership is additive: same identity, personal applications, scoped management", async ({
   page,
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await page.getByLabel("Demo role").selectOption("student");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Your campus",
-  );
   await expect(
-    page
-      .getByRole("navigation")
-      .getByRole("link", { name: "Tasks", exact: true }),
-  ).toHaveCount(0);
+    page.getByRole("heading", { name: "Your campus, Damilola." }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Account access: Student · Organization leader"),
+  ).toBeVisible();
+  await expect(page.locator("header select")).toHaveCount(0);
   await page
     .getByRole("navigation")
     .getByRole("link", { name: "Explore opportunities" })
     .click();
+  await page
+    .getByRole("button", { name: "A Greener Campus", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Tell us why" })
+    .fill("I would like to volunteer alongside other students.");
+  await page.getByRole("button", { name: "Submit application" }).click();
+  await page.goto("/applications");
+  const application = page
+    .getByRole("row")
+    .filter({ hasText: "A Greener Campus" });
+  await expect(application).toContainText("Pending");
+  await managerButton(page).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "Your organization",
+  );
+  await page.goto("/applications");
+  await expect(
+    page.getByRole("row").filter({ hasText: "A Greener Campus" }),
+  ).toHaveCount(0);
+  const riley = page.getByRole("row").filter({ hasText: "Riley Johnson" });
+  await riley.getByRole("button", { name: "Review", exact: true }).click();
+  await page.getByRole("button", { name: "Approve application" }).click();
+  await expect(riley).toContainText("Approved");
+  await personalButton(page).click();
+  await page.goto("/applications");
+  await page.reload();
+  await expect(application).toContainText("Pending");
+  await application.getByRole("button", { name: "View", exact: true }).click();
+  await page.getByRole("button", { name: "Withdraw application" }).click();
+  await expect(application).toContainText("Withdrawn");
+  await page.goto("/analytics");
+  await expect(
+    page.getByText("This page is outside your current workspace"),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("leaders cannot review their own applications", async ({ page }) => {
+  await page.goto("/events");
   await page
     .getByRole("button", {
       name: "Build Together: Campus Hackathon",
@@ -27,47 +101,28 @@ test("student application, manager approval, persistence, and withdrawal", async
     .click();
   await page
     .getByRole("textbox", { name: "Tell us why" })
-    .fill("I want to build a better campus with my classmates.");
+    .fill("I am also participating as a student.");
   await page.getByRole("button", { name: "Submit application" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "My applications" })
-    .click();
-  const application = page
-    .getByRole("row")
-    .filter({ hasText: "Build Together" });
-  await expect(application).toContainText("Pending");
-  await page.getByLabel("Demo role").selectOption("manager");
-  await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Applications" })
-    .click();
-  const sam = page.getByRole("row").filter({ hasText: "Sam Taylor" });
-  await sam.getByRole("button", { name: "Review", exact: true }).click();
-  await page.getByRole("button", { name: "Approve application" }).click();
-  await expect(sam).toContainText("Approved");
-  await page.getByLabel("Demo role").selectOption("student");
+  await managerButton(page).click();
   await page.goto("/applications");
-  await expect(application).toContainText("Approved");
-  await page.reload();
-  await expect(page.getByLabel("Demo role")).toHaveValue("student");
-  await expect(application).toContainText("Approved");
-  await application.getByRole("button", { name: "View", exact: true }).click();
-  await page.getByRole("button", { name: "Withdraw application" }).click();
-  await expect(application).toContainText("Withdrawn");
-  await page.goto("/analytics");
+  await page
+    .getByRole("row")
+    .filter({ hasText: "Damilola Adeyemi" })
+    .getByRole("button", { name: "Review", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Another authorized reviewer",
+  );
   await expect(
-    page.getByText("This page belongs to another role"),
-  ).toBeVisible();
-  expect(errors).toEqual([]);
+    page.getByRole("button", { name: "Approve application" }),
+  ).toHaveCount(0);
 });
 
-test("manager creates and edits an event, manages own tasks, and stays scoped", async ({
+test("manager creates, publishes and completes work only in their organization", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByLabel("Demo role").selectOption("manager");
+  await managerButton(page).click();
   await page.getByRole("button", { name: "Create event", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Title", exact: true })
@@ -82,7 +137,7 @@ test("manager creates and edits an event, manages own tasks, and stays scoped", 
     .fill("An open evening of coding and collaboration.");
   await page
     .getByRole("textbox", { name: "Location", exact: true })
-    .fill("Innovation Hub");
+    .fill("Student activity centre");
   await page
     .getByRole("combobox", { name: "Status", exact: true })
     .selectOption("draft");
@@ -115,49 +170,31 @@ test("manager creates and edits an event, manages own tasks, and stays scoped", 
   ).toBeVisible();
   await page.goto("/organizations");
   await expect(page.locator("tbody tr")).toHaveCount(1);
-  await expect(
-    page.getByRole("button", { name: "New organization" }),
-  ).toHaveCount(0);
 });
 
-test("admin creates an organization and a task, searches, and exports a report", async ({
+test("invited university admin fixture retains campus management and CSV export", async ({
   page,
 }) => {
+  await installAdminFixture(page);
   await page.goto("/organizations");
+  await expect(
+    page.getByLabel("Account access: University administrator"),
+  ).toBeVisible();
   await page.getByRole("button", { name: "New organization" }).click();
   await page
     .getByRole("textbox", { name: "Organization name", exact: true })
     .fill("Campus Astronomy Society");
   await page
     .getByRole("textbox", { name: "Organization lead" })
-    .fill("Jamie Park");
+    .fill("Ada Okafor");
   await page
     .getByRole("textbox", { name: "Description", exact: true })
-    .fill("A community for people curious about the night sky.");
+    .fill("A community for students curious about the night sky.");
   await page.getByRole("button", { name: "Create organization" }).click();
   await page
     .getByRole("searchbox", { name: "Search organizations" })
     .fill("Astronomy");
   await expect(page.locator("tbody tr")).toHaveCount(1);
-  await expect(page.locator("tbody tr")).toContainText("Jamie Park");
-  await page.goto("/tasks");
-  await page.getByRole("button", { name: "Create task", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Task title" })
-    .fill("Arrange telescope viewing");
-  await page
-    .getByRole("combobox", { name: "Organization", exact: true })
-    .selectOption({ label: "Campus Astronomy Society" });
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Create task" })
-    .click();
-  await expect(
-    page.getByRole("button", {
-      name: "Arrange telescope viewing",
-      exact: true,
-    }),
-  ).toBeVisible();
   await page.getByRole("button", { name: "Search workspace" }).click();
   await page
     .getByRole("searchbox", { name: "Search organizations, events, programs" })
@@ -171,72 +208,150 @@ test("admin creates an organization and a task, searches, and exports a report",
   await page.goto("/analytics");
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export report" }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("campusops-report.csv");
+  expect((await downloadPromise).suggestedFilename()).toBe(
+    "campusops-report.csv",
+  );
 });
 
-test("desktop dashboard renders without errors and provides all navigation", async ({
+test("signup previews verified student access and a pending leadership request", async ({
   page,
 }, testInfo) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
+  await page.goto("/sign-up");
+  await page.getByRole("textbox", { name: "Full name" }).fill("Ada Okafor");
+  await page
+    .getByRole("textbox", { name: "Email address" })
+    .fill("ada@example.test");
+  await page
+    .getByRole("radio", { name: "Participate and lead an organization" })
+    .check();
+  await page.getByLabel("Organization you lead").selectOption("org-arts");
   await expect(
-    page.getByRole("heading", { name: "A connected campus starts here." }),
+    page.getByText(
+      "Leadership is confirmed through an invitation or approval.",
+      { exact: false },
+    ),
   ).toBeVisible();
-  await expect(page.getByRole("navigation").getByRole("link")).toHaveCount(6);
   await page.screenshot({
-    path: testInfo.outputPath("campusops-desktop.png"),
+    path: testInfo.outputPath("signup-desktop.png"),
     fullPage: true,
   });
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
-  expect(errors).toEqual([]);
+  await page.getByRole("button", { name: "Preview account setup" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your campus journey starts here." }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Leadership request: pending approval", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No account was created and no email was sent.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Back to the workspace", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your campus, Damilola." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Manage Creative Arts Society" }),
+  ).toHaveCount(0);
 });
 
-test("mobile navigation, role switching and tables fit the viewport", async ({
+test("each tab keeps its workspace while sharing record updates", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/");
+  await expect(personalButton(page)).toHaveAttribute("aria-pressed", "true");
+  const second = await context.newPage();
+  await second.goto("/");
+  await managerButton(second).click();
+  await expect(managerButton(second)).toHaveAttribute("aria-pressed", "true");
+  await expect(personalButton(page)).toHaveAttribute("aria-pressed", "true");
+  await second.reload();
+  await expect(managerButton(second)).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("heading", { name: "Your campus, Damilola." }),
+  ).toBeVisible();
+});
+
+test("legacy data migrates without preserving the old administrator role", async ({
+  page,
+}) => {
+  const legacy = createSeed();
+  await page.addInitScript(
+    (data) =>
+      localStorage.setItem(
+        "campusops-demo-v1",
+        JSON.stringify({ data, role: "admin" }),
+      ),
+    legacy,
+  );
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Your campus, Damilola." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "University administration",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(page.locator("header select")).toHaveCount(0);
+});
+
+test("mobile workspace navigation and signup stay within the viewport", async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Toggle navigation" }).click();
-  await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Events & programs" })
-    .click();
   await expect(
-    page.getByRole("heading", { name: "Good things on the calendar." }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Toggle navigation" }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await managerButton(page).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "Your organization",
+  );
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
+      () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.getByLabel("Demo role").selectOption("student");
+  await page.goto("/sign-up");
   await expect(
-    page.getByRole("heading", { name: "Your campus, Sam." }),
+    page.getByRole("heading", { name: "Join your campus." }),
   ).toBeVisible();
   await page.screenshot({
-    path: testInfo.outputPath("campusops-mobile.png"),
+    path: testInfo.outputPath("signup-mobile.png"),
     fullPage: true,
   });
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
+      () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
 });
 
-test("malformed saved data recovers to a usable demo", async ({ page }) => {
+test("signup and personal dashboard pass automated accessibility checks", async ({
+  page,
+}) => {
+  for (const route of ["/", "/sign-up"]) {
+    await page.goto(route);
+    await page.locator("h1").waitFor();
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(results.violations).toEqual([]);
+  }
+});
+
+test("malformed saved data recovers to a usable account preview", async ({
+  page,
+}) => {
   await page.addInitScript(() =>
-    localStorage.setItem(
-      "campusops-demo-v1",
-      '{"data":{"version":1},"role":"admin"}',
-    ),
+    localStorage.setItem("campusops-preview-v2", '{"data":{"version":2}}'),
   );
   await page.goto("/");
   await expect(
@@ -245,6 +360,69 @@ test("malformed saved data recovers to a usable demo", async ({ page }) => {
       .filter({ hasText: "Saved demo data could not be read" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "A connected campus starts here." }),
+    page.getByRole("heading", { name: "Your campus, Damilola." }),
   ).toBeVisible();
+});
+
+test("collect a local performance baseline and enforce a JavaScript transfer budget", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    Reflect.set(window, "campusMetrics", {});
+    window.addEventListener("campusops:web-vital", (event) => {
+      const detail = (event as CustomEvent<{ name: string; value: number }>)
+        .detail;
+      Reflect.get(window, "campusMetrics")[detail.name] = detail.value;
+    });
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Your campus, Damilola." }),
+  ).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  const initial = await page.evaluate(() => {
+    const nav = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming;
+    const resources = performance.getEntriesByType(
+      "resource",
+    ) as PerformanceResourceTiming[];
+    return {
+      domContentLoadedMs: nav.domContentLoadedEventEnd,
+      javaScriptBytes: resources
+        .filter((item) => item.name.includes(".js"))
+        .reduce((sum, item) => sum + item.encodedBodySize, 0),
+    };
+  });
+  await managerButton(page).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "Your organization",
+  );
+  const metrics = await page.evaluate(() =>
+    Reflect.get(window, "campusMetrics"),
+  );
+  const baselinePath = testInfo.outputPath("performance-baseline.json");
+  await writeFile(
+    baselinePath,
+    JSON.stringify(
+      {
+        measuredAt: new Date().toISOString(),
+        environment:
+          "Local production build, desktop Chromium, no network throttling",
+        ...initial,
+        webVitals: metrics,
+        fieldTargets: performanceBudgets,
+      },
+      null,
+      2,
+    ),
+  );
+  await testInfo.attach("local-performance-baseline", {
+    path: baselinePath,
+    contentType: "application/json",
+  });
+  expect(initial.javaScriptBytes).toBeLessThanOrEqual(
+    performanceBudgets.initialJavaScriptBytes,
+  );
+  expect(metrics.FCP).toBeGreaterThan(0);
 });

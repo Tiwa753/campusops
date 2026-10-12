@@ -1,1 +1,1 @@
-export { TasksPage as default } from "@/components/workspace-pages";
+export { default } from '@/features/tasks/page';

@@ -17,7 +17,13 @@ const names: Record<string, string> = {
   "/activity": "My activity",
   "/settings": "Settings",
 };
-export default function Navbar({ toggleMenu }: { toggleMenu: () => void }) {
+export default function Navbar({
+  toggleMenu,
+  menuOpen,
+}: {
+  toggleMenu: () => void;
+  menuOpen: boolean;
+}) {
   const pathname = usePathname();
   const { accessLabel, university, scoped, openDialog } = useCampus();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -45,6 +51,8 @@ export default function Navbar({ toggleMenu }: { toggleMenu: () => void }) {
           <button
             className="icon-button mobile-menu"
             aria-label="Toggle navigation"
+            aria-expanded={menuOpen}
+            aria-controls="campus-navigation"
             onClick={toggleMenu}
           >
             <Icon name="menu" />
@@ -65,7 +73,13 @@ export default function Navbar({ toggleMenu }: { toggleMenu: () => void }) {
             <span>Search workspace</span>
           </button>
           <span className="topbar-divider" />
-          <div className="access-indicator" aria-label={`Account access: ${accessLabel}`}><Icon name="shield" size={16} /><span>{accessLabel}</span></div>
+          <div
+            className="access-indicator"
+            aria-label={`Account access: ${accessLabel}`}
+          >
+            <Icon name="shield" size={16} />
+            <span>{accessLabel}</span>
+          </div>
         </div>
       </header>
       {searchOpen && (

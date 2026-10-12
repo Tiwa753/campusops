@@ -1,1 +1,1 @@
-export { EventsPage as default } from "@/components/workspace-pages";
+export { default } from '@/features/events/page';

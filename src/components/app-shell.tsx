@@ -34,7 +34,7 @@ function Shell({ children }: { children: ReactNode }) {
       )}
       <Sidebar close={() => setMenuOpen(false)} />
       <div className="main-shell">
-        <Navbar toggleMenu={() => setMenuOpen(!menuOpen)} />
+        <Navbar menuOpen={menuOpen} toggleMenu={() => setMenuOpen(!menuOpen)} />
         <main id="main-content" className="main-content" key={workspaceKey}>
           {denied ? (
             <div className="panel permission-state">

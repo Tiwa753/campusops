@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
   useEffect,
+  useRef,
   type ReactNode,
 } from "react";
 import {
@@ -15,8 +16,20 @@ import {
   type Command,
 } from "@/lib/domain";
 import { previewAdapter } from "@/lib/demo-store";
-import { accountLabel, availableContexts, resolveProfile, universities, type Account, type SignupInput, type University, type WorkspaceContext } from "@/lib/access";
-import type { OnboardingDraft, WorkspaceAdapter } from "@/lib/workspace-adapter";
+import {
+  accountLabel,
+  availableContexts,
+  resolveProfile,
+  universities,
+  type Account,
+  type SignupInput,
+  type University,
+  type WorkspaceContext,
+} from "@/lib/access";
+import type {
+  OnboardingDraft,
+  WorkspaceAdapter,
+} from "@/lib/workspace-adapter";
 import Icon from "./icon";
 
 export type DialogState = {
@@ -40,6 +53,7 @@ type ContextValue = {
   scoped: ReturnType<typeof selectWorkspace>;
   dialog: DialogState;
   error: string;
+  pending: boolean;
   openDialog: (dialog: DialogState) => void;
   selectContext: (context: WorkspaceContext) => Promise<boolean>;
   prepareOnboarding: (input: SignupInput) => Promise<OnboardingDraft>;
@@ -53,7 +67,13 @@ export function useCampus() {
   if (!value) throw new Error("CampusProvider is required.");
   return value;
 }
-export default function CampusProvider({ children, adapter = previewAdapter }: { children: ReactNode; adapter?: WorkspaceAdapter }) {
+export default function CampusProvider({
+  children,
+  adapter = previewAdapter,
+}: {
+  children: ReactNode;
+  adapter?: WorkspaceAdapter;
+}) {
   const snapshot = useSyncExternalStore(
     adapter.subscribe,
     adapter.getSnapshot,
@@ -62,6 +82,8 @@ export default function CampusProvider({ children, adapter = previewAdapter }: {
   const [dialog, openDialog] = useState<DialogState>(null);
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  const mutationInFlight = useRef(false);
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(""), 5000);
@@ -79,7 +101,9 @@ export default function CampusProvider({ children, adapter = previewAdapter }: {
       </div>
     );
   const profile = resolveProfile(snapshot.account, snapshot.context);
-  const university = universities.find(item => item.id === snapshot.context.universityId) ?? universities[0];
+  const university =
+    universities.find((item) => item.id === snapshot.context.universityId) ??
+    universities[0];
   const value: ContextValue = {
     data: snapshot.data,
     profile,
@@ -88,19 +112,36 @@ export default function CampusProvider({ children, adapter = previewAdapter }: {
     context: snapshot.context,
     contexts: availableContexts(snapshot.account),
     accessLabel: accountLabel(snapshot.account, snapshot.context.universityId),
-    prepareOnboarding: input => adapter.prepareOnboarding(input),
+    prepareOnboarding: (input) => adapter.prepareOnboarding(input),
     scoped: selectWorkspace(snapshot.data, profile),
     dialog,
     error,
+    pending,
     openDialog(next) {
       setError("");
       openDialog(next);
     },
     async selectContext(context) {
-      try { await adapter.selectContext(context); openDialog(null); setError(""); return true; }
-      catch (error) { setToast(error instanceof Error ? error.message : "Workspace unavailable."); return false; }
+      if (mutationInFlight.current) {
+        setToast("Please wait for the current change to finish.");
+        return false;
+      }
+      try {
+        await adapter.selectContext(context);
+        openDialog(null);
+        setError("");
+        return true;
+      } catch (error) {
+        setToast(
+          error instanceof Error ? error.message : "Workspace unavailable.",
+        );
+        return false;
+      }
     },
     async run(command, message) {
+      if (mutationInFlight.current) return false;
+      mutationInFlight.current = true;
+      setPending(true);
       try {
         await adapter.execute(command);
         setError("");
@@ -114,6 +155,9 @@ export default function CampusProvider({ children, adapter = previewAdapter }: {
         setError(message);
         setToast(message);
         return false;
+      } finally {
+        mutationInFlight.current = false;
+        setPending(false);
       }
     },
     notify: setToast,

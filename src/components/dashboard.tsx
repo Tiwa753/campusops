@@ -6,7 +6,7 @@ import Icon, { type IconName } from "./icon";
 import { PageHeader, PanelHeader } from "./ui";
 import { ApplicationsTable, EventsTable, TasksTable } from "./data-tables";
 import { ActivityFeed, ParticipationChart } from "./analytics";
-import { canApply } from "@/lib/domain";
+import { canApply, eventStartTime } from "@/lib/domain";
 
 export default function Dashboard() {
   const { data, scoped, profile, openDialog } = useCampus();
@@ -15,7 +15,7 @@ export default function Dashboard() {
     .filter(
       (event) =>
         event.status === "published" &&
-        new Date(`${event.date}T${event.time}`) > new Date(),
+        eventStartTime(event) > new Date().getTime(),
     )
     .sort((a, b) => a.date.localeCompare(b.date));
   const pending = scoped.applications.filter(

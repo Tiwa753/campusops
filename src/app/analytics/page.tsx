@@ -1,1 +1,1 @@
-export { AnalyticsPage as default } from "@/components/workspace-pages";
+export { default } from '@/features/analytics/page';

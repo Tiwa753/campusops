@@ -17,7 +17,7 @@ import {
 } from "@/lib/domain";
 
 function FormFooter({ label = "Save changes" }: { label?: string }) {
-  const { openDialog, error } = useCampus();
+  const { openDialog, error, pending } = useCampus();
   return (
     <>
       {error && (
@@ -33,8 +33,12 @@ function FormFooter({ label = "Save changes" }: { label?: string }) {
         >
           Cancel
         </button>
-        <button type="submit" className="button button-primary">
-          {label}
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={pending}
+        >
+          {pending ? "Saving…" : label}
           <Icon name="arrow" size={16} />
         </button>
       </div>
@@ -68,7 +72,7 @@ function OrganizationSelect({
 }
 
 function EventForm({ id }: { id?: string }) {
-  const { data, profile, run, openDialog } = useCampus();
+  const { data, profile, university, run, openDialog } = useCampus();
   const existing = data.events.find((event) => event.id === id);
   const [status, setStatus] = useState<CampusEvent["status"]>(
     existing?.status ?? "published",
@@ -91,6 +95,7 @@ function EventForm({ id }: { id?: string }) {
       description: value("description"),
       date: value("date"),
       time: value("time"),
+      timeZone: university.timeZone,
       location: value("location"),
       capacity: Number(value("capacity")),
       status,
@@ -149,7 +154,7 @@ function EventForm({ id }: { id?: string }) {
               required
             />
           </Field>
-          <Field label="Time">
+          <Field label={`Time (${university.timeZone})`}>
             <input
               type="time"
               name="time"
@@ -236,7 +241,12 @@ function OrganizationForm({ id }: { id?: string }) {
           : existing!.status,
       color: existing?.color ?? "green",
     };
-    if (await run({ type: "save-organization", organization }, "Organization saved."))
+    if (
+      await run(
+        { type: "save-organization", organization },
+        "Organization saved.",
+      )
+    )
       openDialog(null);
   }
   return (
@@ -633,6 +643,7 @@ function ApplicationDetail({ id }: { id?: string }) {
         )}
         {profile.role !== "student" &&
           application.status === "pending" &&
+          application.studentId !== profile.id &&
           event?.status === "published" && (
             <div className="detail-actions">
               <button
@@ -648,6 +659,14 @@ function ApplicationDetail({ id }: { id?: string }) {
                 <Icon name="check" size={16} />
                 Approve application
               </button>
+            </div>
+          )}
+        {profile.role !== "student" &&
+          application.studentId === profile.id &&
+          application.status === "pending" && (
+            <div className="info-box">
+              Another authorized reviewer must decide on your application. You
+              cannot approve or decline your own request.
             </div>
           )}
         {profile.role === "student" &&

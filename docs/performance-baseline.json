@@ -1,0 +1,16 @@
+{
+  "measuredAt": "2026-10-12T08:42:36.005Z",
+  "environment": "Local production build, desktop Chromium, no network throttling",
+  "domContentLoadedMs": 76.5,
+  "javaScriptBytes": 182154,
+  "webVitals": {
+    "FCP": 256,
+    "TTFB": 18.200000017881393
+  },
+  "fieldTargets": {
+    "lcpMs": 2500,
+    "inpMs": 200,
+    "cls": 0.1,
+    "initialJavaScriptBytes": 358400
+  }
+}

@@ -1,12 +1,11 @@
+import { createSeed, profiles } from "../src/lib/preview/seed.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   applyCommand,
   approvedCount,
   canApply,
-  createSeed,
   exportCsv,
-  profiles,
   selectWorkspace,
 } from "../src/lib/domain.ts";
 

@@ -1,1 +1,1 @@
-export { SettingsPage as default } from "@/components/workspace-pages";
+export { default } from '@/features/settings/page';

@@ -9,7 +9,16 @@ import { initials } from "@/lib/domain";
 export default function Sidebar({ close }: { close: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, scoped, data, context, contexts, selectContext, university, accessLabel } = useCampus();
+  const {
+    profile,
+    scoped,
+    data,
+    context,
+    contexts,
+    selectContext,
+    university,
+    accessLabel,
+  } = useCampus();
   const student = profile.role === "student";
   const links: {
     name: string;
@@ -45,7 +54,7 @@ export default function Sidebar({ close }: { close: () => void }) {
     },
   ];
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" id="campus-navigation">
       <Link href="/dashboard" className="brand" onClick={close}>
         <span className="brand-mark">
           <Icon name="building" size={23} />
@@ -66,14 +75,67 @@ export default function Sidebar({ close }: { close: () => void }) {
       </div>
       <div className="space-navigation" aria-label="Your workspaces">
         <p className="nav-label">YOUR SPACES</p>
-        {contexts.filter(item => item.universityId === university.id).map(item => {
-          const organization = item.kind === "organization" ? data.organizations.find(org => org.id === item.organizationId && org.universityId === item.universityId) : null;
-          const selected = item.kind === context.kind && (item.kind !== "organization" || (context.kind === "organization" && item.organizationId === context.organizationId));
-          const title = item.kind === "personal" ? "My campus" : item.kind === "administration" ? "University administration" : organization?.name ?? "Organization";
-          return <button key={item.kind === "organization" ? item.organizationId : item.kind} aria-label={item.kind === "organization" ? `Manage ${title}` : title} aria-pressed={selected} className={`space-button ${selected ? "selected" : ""}`} onClick={async () => { if (await selectContext(item)) { router.push("/dashboard"); close(); } }}><Icon name={item.kind === "personal" ? "book" : "building"} size={17} /><span><strong>{title}</strong><small>{item.kind === "personal" ? "My participation & applications" : item.kind === "organization" ? "Manage organization" : "Campus operations"}</small></span>{selected && <Icon name="check" size={14} />}</button>;
-        })}
+        {contexts
+          .filter((item) => item.universityId === university.id)
+          .map((item) => {
+            const organization =
+              item.kind === "organization"
+                ? data.organizations.find(
+                    (org) =>
+                      org.id === item.organizationId &&
+                      org.universityId === item.universityId,
+                  )
+                : null;
+            const selected =
+              item.kind === context.kind &&
+              (item.kind !== "organization" ||
+                (context.kind === "organization" &&
+                  item.organizationId === context.organizationId));
+            const title =
+              item.kind === "personal"
+                ? "My campus"
+                : item.kind === "administration"
+                  ? "University administration"
+                  : (organization?.name ?? "Organization");
+            return (
+              <button
+                key={
+                  item.kind === "organization" ? item.organizationId : item.kind
+                }
+                aria-label={
+                  item.kind === "organization" ? `Manage ${title}` : title
+                }
+                aria-pressed={selected}
+                className={`space-button ${selected ? "selected" : ""}`}
+                onClick={async () => {
+                  if (await selectContext(item)) {
+                    router.push("/dashboard");
+                    close();
+                  }
+                }}
+              >
+                <Icon
+                  name={item.kind === "personal" ? "book" : "building"}
+                  size={17}
+                />
+                <span>
+                  <strong>{title}</strong>
+                  <small>
+                    {item.kind === "personal"
+                      ? "My participation & applications"
+                      : item.kind === "organization"
+                        ? "Manage organization"
+                        : "Campus operations"}
+                  </small>
+                </span>
+                {selected && <Icon name="check" size={14} />}
+              </button>
+            );
+          })}
       </div>
-      <p className="nav-label">{student ? "PERSONAL WORKSPACE" : "MANAGEMENT"}</p>
+      <p className="nav-label">
+        {student ? "PERSONAL WORKSPACE" : "MANAGEMENT"}
+      </p>
       <nav aria-label="Main navigation">
         {links.map((link) => (
           <Link
@@ -101,8 +163,13 @@ export default function Sidebar({ close }: { close: () => void }) {
             OAU · LOCAL PREVIEW
           </span>
           <p>One account. Every part of campus.</p>
-          <span>Sample data. Your personal activity stays yours when you manage a club.</span>
-          <Link href="/sign-up" onClick={close} className="preview-signup-link">Preview account setup <Icon name="arrow" size={13} /></Link>
+          <span>
+            Sample data. Your personal activity stays yours when you manage a
+            club.
+          </span>
+          <Link href="/sign-up" onClick={close} className="preview-signup-link">
+            Preview account setup <Icon name="arrow" size={13} />
+          </Link>
         </div>
         <Link
           href="/settings"

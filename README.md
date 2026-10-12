@@ -1,58 +1,60 @@
-# CampusOps
+﻿# CampusOps
 
-A row-based university operations dashboard built with Next.js 16 and React 19. This working demo connects organizations, events, programs, tasks, applications, and analytics across three role interfaces.
+CampusOps is a university operations application beginning with an OAU product preview in Nigeria. It connects student organizations, events, programs, tasks, applications, and analytics. The current implementation prepares the interface and domain architecture for a backend; it is not a live authentication system.
 
-## Run locally
+## Run
 
-Use Node.js 22.18 or later (the domain tests use native TypeScript support).
+Use Node.js 22.18 or later.
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). The overview is available at `/` and `/dashboard`.
+Open [localhost:3000](http://localhost:3000). Account setup is at [/sign-up](http://localhost:3000/sign-up).
 
-## Try the complete workflow
+## One account, personal and organization workspaces
 
-1. Use **Viewing as** in the top bar to choose **Organization manager**. Jordan Lee manages the **Tech & Innovation Club**.
-2. Create a published event or program for that organization.
-3. Switch to **Student**. Sam Taylor can browse organizations, find opportunities, submit applications, withdraw them, and follow personal activity.
-4. Switch back to **Organization manager**, open **Applications**, and approve or decline Sam's pending application.
-5. Switch to **Student** to see the decision and activity update. Refresh the page to check persistence.
-6. Choose **Administrator** to manage all organizations, opportunities, tasks, applications, and reports. Settings includes a confirmed reset of the local demo data.
+The preview starts as **Damilola Adeyemi**, an OAU student who also leads **Tech & Innovation Club**. The top bar shows read-only membership information. There is no editable role selector.
 
-## Roles
+- **My campus**: browse campus opportunities, apply to other organizations' events, and track personal applications and activity.
+- **Manage Tech & Innovation Club**: manage that organization's events, tasks, applications, and reports.
+- Moving between spaces keeps the same account and student ID. A person can have several leadership memberships.
+- A leader cannot approve or reject their own application. Another authorized reviewer must decide.
+- University administration requires a provisioned administrator membership. Public signup never grants administrator privileges.
 
-| Capability          | Administrator                   | Organization manager                    | Student                                  |
-| ------------------- | ------------------------------- | --------------------------------------- | ---------------------------------------- |
-| Organizations       | Create/edit all; activate/pause | Edit own organization                   | Browse active organizations              |
-| Events and programs | Manage all                      | Manage own organization's               | Browse published opportunities and apply |
-| Tasks               | Create/edit/complete all        | Create/edit/complete own organization's | No access                                |
-| Applications        | Review all                      | Review own organization's               | Submit, track, withdraw own              |
-| Analytics           | Whole campus; CSV export        | Own organization; CSV export            | Personal activity                        |
+To try it, apply to **A Greener Campus** in My campus, open your applications, then visit the club management space. The personal application remains yours and does not appear in that unrelated club's review queue. You can review other students' Tech & Innovation Club applications from the management space.
 
-Search, filters, status updates, capacity checks, duplicate-application prevention, form validation, mobile navigation, and CSV exports work with the demo records. Event cancellation and organization pausing preserve historical applications. Attendance and organization member counts are manually entered; analytics distinguish memberships and event check-ins from unique students.
+## Signup and permissions
 
-## Demo storage and security boundary
+The signup page collects a university and an intention to participate or lead. The domain creates a **pending** student membership and, where requested, a separate **pending** leadership request. Verification and authorized approval are prerequisites for access.
 
-Sample data and the selected role are saved under `campusops-demo-v1` in browser local storage. Dates are relative to when the workspace is first created. Normal refreshes preserve the data; resetting creates fresh sample dates. Open tabs synchronize storage updates, with the latest write winning. If browser storage is unavailable, a visible warning explains that changes are temporary.
+This is a signup **preview**: no password is collected, no account is created, no email is sent, and no access is granted. Submitted details remain in memory only. Real signup, sign-in, email verification, invitations, and approval persistence will be implemented when a backend is connected.
 
-**This is a browser-local demo, not production authentication or authorization.** All sample data is delivered to the browser, and the role selector intentionally permits switching identities. Client-side scope checks model the intended workflows but do not protect private records against a user inspecting or modifying browser state. No real student information should be entered here.
+The browser adapter uses a preprovisioned sample account. Its local membership data is editable in browser tools and is **not a production security boundary**. No real student information belongs in the preview.
 
-The production stage needs authenticated users, server-validated organization memberships, database-level access rules, transactional capacity checks, and durable shared storage. Review decisions would also need a server-side audit trail identifying the reviewer.
+## Architecture
 
-## Code map
+Read [architecture and backend integration](docs/architecture.md) for the identity model, entity relationships, university isolation, signup lifecycle, access rules, security boundaries, and performance targets.
 
-- `src/lib/domain.ts`: data types, sample data, scoped selectors, permission checks, validated state transitions, and CSV escaping.
-- `src/lib/demo-store.ts`: browser persistence, storage recovery, and cross-tab synchronization.
-- `src/components/campus-provider.tsx`: shared application state, role selection, dialogs, and notifications.
-- `src/components/dashboard.tsx`: role-specific overview.
-- `src/components/workspace-pages.tsx`: organization, event, task, application, analytics, activity, and settings pages.
-- `src/components/dialogs.tsx`: record editors, opportunity details, applications, and review actions.
-- `src/app/globals.css`: responsive workspace styling.
+- `src/lib/access.ts`: accounts, memberships, university configuration, and authorized workspace resolution.
+- `src/lib/domain.ts`: university-scoped records and validated business operations.
+- `src/lib/calendar.ts`: university timezone handling; OAU uses Africa/Lagos.
+- `src/lib/workspace-adapter.ts`: async interface separating UI from data and session infrastructure.
+- `src/lib/demo-store.ts`: browser-only preview implementation and legacy migration.
+- `src/lib/preview/seed.ts`: isolated sample data.
+- `src/features/*`: independent page modules using reusable tables and controls.
+- `src/components/web-vitals.tsx`: local Web Vitals event instrumentation; no external telemetry.
 
-## Verify
+All operational records carry `universityId`. Production server queries and database access rules must enforce this scope. University names, locale, country, and timezone come from configuration rather than OAU-specific branches.
+
+## Persistence
+
+Preview records and the sample account use `campusops-preview-v2` in local storage. The selected workspace uses `campusops-workspace-context` in session storage, so personal and management tabs remain independent. Record updates synchronize across tabs with the latest write winning; transactional concurrency is a backend requirement.
+
+Existing `campusops-demo-v1` records migrate without retaining their editable role selection. Resetting from Settings restores the sample account and data. Storage failures show a visible warning.
+
+## Verification
 
 ```bash
 npm test
@@ -60,6 +62,8 @@ npm run build
 npm run test:e2e
 ```
 
-The unit suite tests role isolation, unauthorized mutations, application review and withdrawal, duplicate prevention, capacity limits, validation, and safe CSV output. Playwright tests run against the production build, start their own server on port 3100, and cover full workflows, persistence, desktop/mobile layouts, and corrupt-storage recovery.
+Domain tests cover multi-membership access, pending/revoked/suspended memberships, cross-university isolation, signup escalation attempts, self-review, application workflows, capacity, validation, dates, and CSV escaping.
 
-On Windows, browser tests use installed Microsoft Edge. Elsewhere, install Chromium with `npx playwright install chromium`. Set `PLAYWRIGHT_CHANNEL` to override the browser channel. Test screenshots and failure traces are saved in the ignored `test-results` directory.
+Browser tests cover personal/manager workflows, a provisioned admin fixture, signup, migration, independent tabs, mobile layouts, keyboard dialog dismissal, automated accessibility, and a production JavaScript transfer budget. Playwright starts a production server on port 3100. Windows uses installed Microsoft Edge; elsewhere run `npx playwright install chromium`. Override the browser with `PLAYWRIGHT_CHANNEL`.
+
+Screenshots, failure traces, and the local performance measurement are attached in `test-results`. The baseline is a local desktop lab observation; field LCP, INP, and CLS targets must be verified on real devices and Nigerian mobile networks before launch.

@@ -1,1 +1,1 @@
-export { ApplicationsPage as default } from "@/components/workspace-pages";
+export { default } from '@/features/applications/page';

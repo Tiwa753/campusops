@@ -1,13 +1,23 @@
+import { createSeed } from "./preview/seed";
 import {
   applyCommand,
-  createSeed,
+  eventStartTime,
   type Command,
   type Workspace,
 } from "./domain";
-import { availableContexts, createPreviewAccount, prepareSignup, resolveProfile, type Account, type SignupInput, type WorkspaceContext } from "./access";
+import {
+  availableContexts,
+  createPreviewAccount,
+  prepareSignup,
+  resolveProfile,
+  type Account,
+  type SignupInput,
+  type WorkspaceContext,
+} from "./access";
 import type { WorkspaceAdapter, WorkspaceSnapshot } from "./workspace-adapter";
 
 const KEY = "campusops-preview-v2";
+const CONTEXT_KEY = "campusops-workspace-context";
 type Snapshot = WorkspaceSnapshot;
 let snapshot: Snapshot | null = null;
 const listeners = new Set<() => void>();
@@ -37,11 +47,24 @@ function readStored(raw: string | null): Snapshot {
   if (
     !isRecord(stored) ||
     !isRecord(stored.data) ||
-    !isRecord(stored.account) || !isRecord(stored.account.identity) ||
-    !["id", "name", "email"].every(key => typeof (stored.account as Record<string, Record<string, unknown>>).identity[key] === "string") ||
-    !records(stored.account.universityMemberships, ["universityId", "role", "status"]) ||
-    !records(stored.account.organizationMemberships, ["universityId", "organizationId", "role", "status"]) ||
-    !isRecord(stored.context)
+    !isRecord(stored.account) ||
+    !isRecord(stored.account.identity) ||
+    !["id", "name", "email"].every(
+      (key) =>
+        typeof (stored.account as Record<string, Record<string, unknown>>)
+          .identity[key] === "string",
+    ) ||
+    !records(stored.account.universityMemberships, [
+      "universityId",
+      "role",
+      "status",
+    ]) ||
+    !records(stored.account.organizationMemberships, [
+      "universityId",
+      "organizationId",
+      "role",
+      "status",
+    ])
   )
     throw new Error("Invalid demo data");
   const data = stored.data;
@@ -50,7 +73,8 @@ function readStored(raw: string | null): Snapshot {
     !records(
       data.organizations,
       [
-        "id", "universityId",
+        "id",
+        "universityId",
         "name",
         "initials",
         "category",
@@ -64,7 +88,8 @@ function readStored(raw: string | null): Snapshot {
     !records(
       data.events,
       [
-        "id", "universityId",
+        "id",
+        "universityId",
         "title",
         "organizationId",
         "kind",
@@ -77,7 +102,8 @@ function readStored(raw: string | null): Snapshot {
       ["capacity", "attendance"],
     ) ||
     !records(data.tasks, [
-      "id", "universityId",
+      "id",
+      "universityId",
       "title",
       "organizationId",
       "assignee",
@@ -86,7 +112,8 @@ function readStored(raw: string | null): Snapshot {
       "status",
     ]) ||
     !records(data.applications, [
-      "id", "universityId",
+      "id",
+      "universityId",
       "eventId",
       "studentId",
       "studentName",
@@ -95,17 +122,48 @@ function readStored(raw: string | null): Snapshot {
       "status",
       "createdAt",
     ]) ||
-    !records(data.activity, ["id", "universityId", "actorId", "actorName", "text", "createdAt"])
+    !records(data.activity, [
+      "id",
+      "universityId",
+      "actorId",
+      "actorName",
+      "text",
+      "createdAt",
+    ])
   )
     throw new Error("Invalid demo data");
+  data.events = (data.events as Record<string, unknown>[]).map((event) => ({
+    ...event,
+    timeZone:
+      typeof event.timeZone === "string" ? event.timeZone : "Africa/Lagos",
+  }));
+  for (const event of (data as Workspace).events) {
+    if (!Number.isFinite(eventStartTime(event)))
+      throw new Error("Invalid event date");
+  }
   const account = stored.account as Account;
-  const context = stored.context as WorkspaceContext;
+  const context = (stored.context ??
+    availableContexts(account)[0]) as WorkspaceContext;
   resolveProfile(account, context);
-  return { mode: "preview", data: data as Workspace, account, context, onboarding: null, warning: "" };
+  return {
+    mode: "preview",
+    data: data as Workspace,
+    account,
+    context,
+    onboarding: null,
+    warning: "",
+  };
 }
 function freshSnapshot(): Snapshot {
   const account = createPreviewAccount();
-  return { mode: "preview", data: createSeed(), account, context: availableContexts(account)[0], onboarding: null, warning: "" };
+  return {
+    mode: "preview",
+    data: createSeed(),
+    account,
+    context: availableContexts(account)[0],
+    onboarding: null,
+    warning: "",
+  };
 }
 function emit() {
   listeners.forEach((listener) => listener());
@@ -121,11 +179,44 @@ function load() {
         try {
           const legacy = JSON.parse(legacyRaw).data;
           const migrated = { ...legacy, version: 2 };
-          for (const key of ["organizations", "events", "tasks", "applications", "activity"]) migrated[key] = legacy[key].map((item: Record<string, unknown>) => ({ ...item, universityId: "oau" }));
-          snapshot = readStored(JSON.stringify({ ...snapshot, data: migrated }));
-        } catch { /* A malformed legacy demo never replaces the fresh workspace. */ }
+          for (const key of [
+            "organizations",
+            "events",
+            "tasks",
+            "applications",
+            "activity",
+          ])
+            migrated[key] = legacy[key].map(
+              (item: Record<string, unknown>) => ({
+                ...item,
+                universityId: "oau",
+              }),
+            );
+          snapshot = readStored(
+            JSON.stringify({ ...snapshot, data: migrated }),
+          );
+        } catch {
+          /* A malformed legacy demo never replaces the fresh workspace. */
+        }
       }
-      window.localStorage.setItem(KEY, JSON.stringify(snapshot));
+      window.localStorage.setItem(
+        KEY,
+        JSON.stringify({
+          mode: snapshot.mode,
+          data: snapshot.data,
+          account: snapshot.account,
+        }),
+      );
+    }
+    try {
+      const savedContext = window.sessionStorage.getItem(CONTEXT_KEY);
+      if (savedContext) {
+        const context = JSON.parse(savedContext) as WorkspaceContext;
+        resolveProfile(snapshot.account, context);
+        snapshot = { ...snapshot, context };
+      }
+    } catch {
+      /* Invalid or revoked context falls back to a permitted space. */
     }
   } catch {
     snapshot = {
@@ -164,8 +255,13 @@ function commit(next: Snapshot) {
   try {
     window.localStorage.setItem(
       KEY,
-      JSON.stringify({ mode: next.mode, data: next.data, account: next.account, context: next.context }),
+      JSON.stringify({
+        mode: next.mode,
+        data: next.data,
+        account: next.account,
+      }),
     );
+    window.sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(next.context));
     snapshot = { ...next, warning: "" };
   } catch {
     snapshot = {
@@ -180,7 +276,11 @@ async function execute(command: Command) {
   if (!snapshot) throw new Error("Workspace is loading.");
   commit({
     ...snapshot,
-    data: applyCommand(snapshot.data, resolveProfile(snapshot.account, snapshot.context), command),
+    data: applyCommand(
+      snapshot.data,
+      resolveProfile(snapshot.account, snapshot.context),
+      command,
+    ),
   });
 }
 async function selectContext(context: WorkspaceContext) {
@@ -190,13 +290,28 @@ async function selectContext(context: WorkspaceContext) {
 }
 async function prepareOnboarding(input: SignupInput) {
   if (!snapshot) throw new Error("Workspace is loading.");
-  const organizationIds = snapshot.data.organizations.filter(org => org.universityId === input.universityId && org.status === "active").map(org => org.id);
+  const organizationIds = snapshot.data.organizations
+    .filter(
+      (org) =>
+        org.universityId === input.universityId && org.status === "active",
+    )
+    .map((org) => org.id);
   const onboarding = prepareSignup(input, organizationIds);
   // Preview submissions are ephemeral: no account is created and no email is sent.
   snapshot = { ...snapshot, onboarding };
   emit();
   return onboarding;
 }
-async function resetPreview() { commit(freshSnapshot()); }
+async function resetPreview() {
+  commit(freshSnapshot());
+}
 
-export const previewAdapter: WorkspaceAdapter = { subscribe, getSnapshot, getServerSnapshot, execute, selectContext, prepareOnboarding, resetPreview };
+export const previewAdapter: WorkspaceAdapter = {
+  subscribe,
+  getSnapshot,
+  getServerSnapshot,
+  execute,
+  selectContext,
+  prepareOnboarding,
+  resetPreview,
+};
