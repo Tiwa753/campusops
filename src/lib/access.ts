@@ -37,6 +37,7 @@ export type Account = {
   identity: Identity;
   universityMemberships: UniversityMembership[];
   organizationMemberships: OrganizationMembership[];
+  signupIntent?: "student" | "organization_manager" | "both";
 };
 // A workspace selects a context. It never grants a membership or changes identity.
 export type WorkspaceContext =

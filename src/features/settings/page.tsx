@@ -14,6 +14,10 @@ export default function SettingsPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+  const [confirmDeletion, setConfirmDeletion] = useState(false);
+  const [deletionPending, setDeletionPending] = useState(false);
+  const [deletionError, setDeletionError] = useState("");
+  const [deletionNotice, setDeletionNotice] = useState("");
 
   async function signOut() {
     if (signingOut) return;
@@ -38,6 +42,36 @@ export default function SettingsPage() {
       setSigningOut(false);
     }
   }
+
+  async function requestAccountDeletion() {
+    if (deletionPending) return;
+    setDeletionPending(true);
+    setDeletionError("");
+    try {
+      const response = await fetch("/api/auth/delete-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        message?: string;
+      };
+      if (!response.ok) {
+        setDeletionError(result.error ?? "Unable to send the confirmation email.");
+        return;
+      }
+      setConfirmDeletion(false);
+      setDeletionNotice(
+        result.message ?? "Check your email to confirm account deletion.",
+      );
+    } catch {
+      setDeletionError("Couldn’t reach CampusOps. Please try again.");
+    } finally {
+      setDeletionPending(false);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -84,6 +118,24 @@ export default function SettingsPage() {
       </section>
       <section className="panel settings-panel">
         <PanelHeader
+          title="Signup preference"
+          description="This records the experience you selected; it does not grant permissions."
+        />
+        <div className="settings-description">
+          <p>
+            {account.signupIntent === "organization_manager"
+              ? "Organization manager"
+              : account.signupIntent === "both"
+                ? "Student and organization manager"
+                : "Student"}
+            . Student access is available to every verified account.
+            Organization management appears only after an organization
+            administrator provisions an active manager membership.
+          </p>
+        </div>
+      </section>
+      <section className="panel settings-panel">
+        <PanelHeader
           title="Organization memberships"
           description="Leading a club adds management access. Your student identity and personal applications stay the same."
         />
@@ -125,6 +177,40 @@ export default function SettingsPage() {
           {signOutError && (
             <p className="form-error" role="alert">
               {signOutError}
+            </p>
+          )}
+        </div>
+      </section>
+      <section className="panel settings-panel">
+        <PanelHeader
+          title="Delete account"
+          description="Request a confirmation email to permanently remove your authenticated account."
+        />
+        <div className="settings-description">
+          <p>
+            Your profile and organization memberships will be removed only
+            after you confirm from your verified email address. The link
+            expires after 30 minutes. Local sample preview records remain in
+            this browser because they are separate from your authenticated
+            account.
+          </p>
+          <button
+            className="button button-danger"
+            onClick={() => {
+              setDeletionError("");
+              setConfirmDeletion(true);
+            }}
+          >
+            Request account deletion
+          </button>
+          {deletionNotice && (
+            <p className="auth-notice" role="status">
+              {deletionNotice}
+            </p>
+          )}
+          {deletionError && (
+            <p className="form-error" role="alert">
+              {deletionError}
             </p>
           )}
         </div>
@@ -224,6 +310,30 @@ export default function SettingsPage() {
               }}
             >
               Restore sample data
+            </button>
+          </div>
+        </Modal>
+      )}
+      {confirmDeletion && (
+        <Modal
+          title="Request account deletion?"
+          description={`We’ll send a confirmation link to ${profile.email}. Your account stays active unless you open that email and confirm deletion.`}
+          onClose={() => setConfirmDeletion(false)}
+        >
+          <div className="modal-footer">
+            <button
+              className="button button-secondary"
+              onClick={() => setConfirmDeletion(false)}
+              disabled={deletionPending}
+            >
+              Keep my account
+            </button>
+            <button
+              className="button button-danger"
+              onClick={requestAccountDeletion}
+              disabled={deletionPending}
+            >
+              {deletionPending ? "Sending…" : "Send confirmation email"}
             </button>
           </div>
         </Modal>

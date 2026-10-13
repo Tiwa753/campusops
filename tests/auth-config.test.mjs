@@ -6,6 +6,7 @@ import {
   safeRedirectPath,
   SupabaseConfigurationError,
 } from "../src/lib/supabase/config.ts";
+import { validSignupIntent } from "../src/lib/supabase/signup-intent.ts";
 
 function withAuthConfig(run, overrides = {}) {
   const keys = [
@@ -60,5 +61,14 @@ test("auth redirects remain on-site and avoid auth and API endpoints", () => {
     assert.equal(safeRedirectPath("/\\attacker.example"), "/dashboard");
     assert.equal(safeRedirectPath("/api/auth/sign-out"), "/dashboard");
     assert.equal(safeRedirectPath("/sign-in"), "/dashboard");
+  });
+
+  test("signup intent accepts only display preferences and never acts as a role", () => {
+    assert.equal(validSignupIntent("student"), true);
+    assert.equal(validSignupIntent("organization_manager"), true);
+    assert.equal(validSignupIntent("both"), true);
+    assert.equal(validSignupIntent("admin"), false);
+    assert.equal(validSignupIntent("manager"), false);
+    assert.equal(validSignupIntent(undefined), false);
   });
 });

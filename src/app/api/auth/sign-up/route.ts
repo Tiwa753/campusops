@@ -10,6 +10,7 @@ import {
   validEmail,
   validPassword,
 } from "@/lib/supabase/route-utils";
+import { validSignupIntent } from "@/lib/supabase/signup-intent";
 
 export async function POST(request: NextRequest) {
   const originError = sameOriginError(request);
@@ -21,6 +22,8 @@ export async function POST(request: NextRequest) {
     typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const universityId =
     typeof body?.universityId === "string" ? body.universityId : "";
+  const signupIntent =
+    typeof body?.signupIntent === "string" ? body.signupIntent : "";
   const password = body?.password;
 
   if (fullName.length < 2 || fullName.length > 80) {
@@ -32,6 +35,9 @@ export async function POST(request: NextRequest) {
   }
   if (!universities.some((university) => university.id === universityId)) {
     return authJsonError("Select a supported university.", 400);
+  }
+  if (!validSignupIntent(signupIntent)) {
+    return authJsonError("Choose a valid account type.", 400);
   }
 
   try {
@@ -47,7 +53,11 @@ export async function POST(request: NextRequest) {
       email,
       password,
       options: {
-        data: { full_name: fullName, university_id: universityId },
+        data: {
+          full_name: fullName,
+          university_id: universityId,
+          signup_intent: signupIntent,
+        },
         emailRedirectTo: `${siteUrl}/auth/callback?next=/dashboard`,
       },
     });

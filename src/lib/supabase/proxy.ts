@@ -10,6 +10,8 @@ const publicPaths = new Set([
   "/forgot-password",
   "/reset-password",
   "/auth/callback",
+  "/account-deletion",
+  "/account-deleted",
 ]);
 
 export async function updateSupabaseSession(request: NextRequest) {

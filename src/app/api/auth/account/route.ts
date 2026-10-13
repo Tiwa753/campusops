@@ -14,7 +14,7 @@ export async function GET() {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("full_name, university_id, role")
+    .select("full_name, university_id, role, signup_intent")
     .eq("id", user.id)
     .maybeSingle();
   if (profileError) {
@@ -49,6 +49,7 @@ export async function GET() {
       name: profile.full_name,
       email: user.email ?? "",
     },
+    signupIntent: profile.signup_intent,
     universityMemberships: [
       {
         universityId: profile.university_id,

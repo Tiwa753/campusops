@@ -235,6 +235,21 @@ export default function AuthPanel({
                     <option value="oau">Obafemi Awolowo University (OAU)</option>
                   </select>
                 </label>
+                <label className="auth-field">
+                  <span>What are you signing up as?</span>
+                  <select name="signupIntent" defaultValue="student" required>
+                    <option value="student">Student</option>
+                    <option value="organization_manager">
+                      Organization manager
+                    </option>
+                    <option value="both">Both</option>
+                  </select>
+                  <small>
+                    Manager tools appear only after an organization provisions
+                    an active manager membership. This choice does not grant
+                    access.
+                  </small>
+                </label>
               </>
             )}
             {mode !== "reset" && (

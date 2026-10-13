@@ -1,4 +1,4 @@
-﻿import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { writeFile } from "node:fs/promises";
 import { createSeed } from "../../src/lib/preview/seed";
@@ -213,21 +213,20 @@ test("invited university admin fixture retains campus management and CSV export"
   );
 });
 
-test("signup previews verified student access and a pending leadership request", async ({
+test("signup records account intent without granting manager access", async ({
   page,
 }, testInfo) => {
   await page.goto("/sign-up");
-  await page.getByRole("textbox", { name: "Full name" }).fill("Ada Okafor");
-  await page
-    .getByRole("textbox", { name: "Email address" })
-    .fill("ada@example.test");
-  await page
-    .getByRole("radio", { name: "Participate and lead an organization" })
-    .check();
-  await page.getByLabel("Organization you lead").selectOption("org-arts");
+  const signupIntent = page.getByLabel("What are you signing up as?");
+  await expect(signupIntent.locator("option")).toHaveText([
+    "Student",
+    "Organization manager",
+    "Both",
+  ]);
+  await signupIntent.selectOption("organization_manager");
   await expect(
     page.getByText(
-      "Leadership is confirmed through an invitation or approval.",
+      "Manager tools appear only after an organization provisions an active manager membership. This choice does not grant access.",
       { exact: false },
     ),
   ).toBeVisible();
@@ -235,27 +234,6 @@ test("signup previews verified student access and a pending leadership request",
     path: testInfo.outputPath("signup-desktop.png"),
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Preview account setup" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Your campus journey starts here." }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Leadership request: pending approval", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("No account was created and no email was sent.", {
-      exact: false,
-    }),
-  ).toBeVisible();
-  await page
-    .getByRole("link", { name: "Back to the workspace", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Your campus, Damilola." }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Manage Creative Arts Society" }),
-  ).toHaveCount(0);
 });
 
 test("each tab keeps its workspace while sharing record updates", async ({
