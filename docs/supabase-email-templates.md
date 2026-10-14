@@ -17,8 +17,10 @@ verified sender identity for `RESEND_FROM_EMAIL`.
    - Sender name: `CampusOps`
    - Sender email: the verified address used in `RESEND_FROM_EMAIL`
 3. Open **Authentication → Email Templates → Confirm signup**. Set the subject
-   to `Confirm your CampusOps account` and replace the message with the
-   template below.
+   to `Your CampusOps verification code` and replace the message with the
+   template below. The signup form verifies the numeric code in this email, so
+   the template must include `{{ .Token }}` rather than only a confirmation
+   link.
 4. Keep the Supabase Site URL and allowed callback URL in sync with
    `NEXT_PUBLIC_SITE_URL`. For local development, add
    `http://localhost:3000/auth/callback`; use the deployed HTTPS callback URL
@@ -30,12 +32,9 @@ verified sender identity for `RESEND_FROM_EMAIL`.
 <div style="font-family:Arial,sans-serif;max-width:560px;margin:40px auto;color:#17172a;line-height:1.6">
   <p style="color:#5b5bd6;font-weight:700;letter-spacing:.08em">CAMPUSOPS</p>
   <h1 style="font-size:24px">Confirm your CampusOps account</h1>
-  <p>Thanks for joining CampusOps. Confirm your email address to activate your account.</p>
-  <p>
-    <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#5b5bd6;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;font-weight:700">
-      Confirm email address
-    </a>
-  </p>
+  <p>Thanks for joining CampusOps. Enter this verification code on the signup page to activate your account:</p>
+  <p style="display:inline-block;background:#eeedff;color:#34329a;padding:14px 20px;border-radius:8px;font-size:26px;font-weight:700;letter-spacing:6px">{{ .Token }}</p>
+  <p>This code expires after the period configured in Supabase Auth.</p>
   <p>If you did not create this account, you can ignore this email.</p>
   <p>CampusOps</p>
 </div>

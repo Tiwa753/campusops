@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Icon from "@/components/icon";
 
 type AuthMode = "signup" | "signin" | "forgot" | "reset";
+type SignupStage = "form" | "verification" | "success" | "loading";
 
 const authCopy: Record<
   AuthMode,
@@ -62,6 +63,8 @@ export default function AuthPanel({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [signupStage, setSignupStage] = useState<SignupStage>("form");
+  const [signupRedirect, setSignupRedirect] = useState("/dashboard");
   const [notice, setNotice] = useState(() => {
     if (mode !== "signin") return "";
     if (verificationNotice) {
@@ -71,6 +74,20 @@ export default function AuthPanel({
   });
   const [email, setEmail] = useState("");
 
+  useEffect(() => {
+    if (signupStage === "success") {
+      const timer = window.setTimeout(() => setSignupStage("loading"), 1800);
+      return () => window.clearTimeout(timer);
+    }
+    if (signupStage === "loading") {
+      const timer = window.setTimeout(() => {
+        router.replace(signupRedirect);
+        router.refresh();
+      }, 1400);
+      return () => window.clearTimeout(timer);
+    }
+  }, [router, signupRedirect, signupStage]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -79,9 +96,17 @@ export default function AuthPanel({
     setNotice("");
     const formData = new FormData(event.currentTarget);
     const body = Object.fromEntries(formData.entries());
+    const isEmailVerification =
+      mode === "signup" && signupStage === "verification";
     if (mode === "signin") {
       body.next = new URLSearchParams(window.location.search).get("next") ?? "";
       setEmail(String(body.email ?? ""));
+    }
+    if (mode === "signup" && !isEmailVerification) {
+      setEmail(String(body.email ?? ""));
+    }
+    if (isEmailVerification) {
+      body.email = email;
     }
     const endpoint = {
       signup: "/api/auth/sign-up",
@@ -89,9 +114,12 @@ export default function AuthPanel({
       forgot: "/api/auth/forgot-password",
       reset: "/api/auth/reset-password",
     }[mode];
+    const requestEndpoint = isEmailVerification
+      ? "/api/auth/verify-email"
+      : endpoint;
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetch(requestEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -109,13 +137,15 @@ export default function AuthPanel({
       }
       setEmail(String(body.email ?? email));
 
-      if (mode === "signup" && result.confirmationRequired) {
-        setNotice(
-          "Your account is ready. Check your email and confirm your address before signing in.",
-        );
+      if (isEmailVerification) {
+        setSignupRedirect(result.redirectTo ?? "/dashboard");
+        setSignupStage("success");
+      } else if (mode === "signup" && result.confirmationRequired) {
+        setSignupStage("verification");
+        setNotice("");
       } else if (mode === "signup") {
-        router.replace(result.redirectTo ?? "/dashboard");
-        router.refresh();
+        setSignupRedirect(result.redirectTo ?? "/dashboard");
+        setSignupStage("success");
       } else if (mode === "signin") {
         router.replace(result.redirectTo ?? "/dashboard");
         router.refresh();
@@ -151,6 +181,8 @@ export default function AuthPanel({
       };
       if (!response.ok) {
         setError(result.error ?? "Unable to resend the confirmation email.");
+      } else if (mode === "signup" && signupStage === "verification") {
+        setNotice("If the account needs confirmation, a new code will arrive shortly.");
       } else {
         setNotice(
           result.message ??
@@ -170,6 +202,31 @@ export default function AuthPanel({
   const copy = authCopy[mode];
   const isPasswordRecovery = mode === "forgot";
   const primaryPath = mode === "signup" ? "/sign-up" : "/sign-in";
+
+  if (mode === "signup" && signupStage === "success") {
+    return (
+      <main className="signup-transition" role="status" aria-live="polite">
+        <span className="signup-success-mark">
+          <Icon name="check" size={48} />
+        </span>
+        <h1>Sign up successful</h1>
+        <p>Your account is ready. Welcome to CampusOps.</p>
+      </main>
+    );
+  }
+
+  if (mode === "signup" && signupStage === "loading") {
+    return (
+      <main className="workspace-loading signup-loading" role="status">
+        <span className="brand-mark">
+          <Icon name="building" size={26} />
+        </span>
+        <strong>CampusOps</strong>
+        <span>Getting your campus ready…</span>
+        <span className="signup-loading-spinner" aria-hidden="true" />
+      </main>
+    );
+  }
 
   return (
     <main className="onboarding-layout auth-layout">
@@ -214,95 +271,140 @@ export default function AuthPanel({
         </Link>
         <div className="onboarding-form-card auth-form-card">
           <p className="eyebrow">{copy.eyebrow}</p>
-          <h2>{copy.title}</h2>
-          <p className="onboarding-intro">{copy.description}</p>
-          <form onSubmit={submit} aria-label={copy.title}>
-            {mode === "signup" && (
-              <>
-                <label className="auth-field">
-                  <span>Full name</span>
-                  <input
-                    name="fullName"
-                    autoComplete="name"
-                    minLength={2}
-                    maxLength={80}
-                    required
-                  />
-                </label>
-                <label className="auth-field">
-                  <span>University</span>
-                  <select name="universityId" defaultValue="oau" required>
-                    <option value="oau">Obafemi Awolowo University (OAU)</option>
-                  </select>
-                </label>
-                <label className="auth-field">
-                  <span>What are you signing up as?</span>
-                  <select name="signupIntent" defaultValue="student" required>
-                    <option value="student">Student</option>
-                    <option value="organization_manager">
-                      Organization manager
-                    </option>
-                    <option value="both">Both</option>
-                  </select>
-                  <small>
-                    Manager tools appear only after an organization provisions
-                    an active manager membership. This choice does not grant
-                    access.
-                  </small>
-                </label>
-              </>
-            )}
-            {mode !== "reset" && (
+          <h2>
+            {signupStage === "verification"
+              ? "Check your email."
+              : copy.title}
+          </h2>
+          <p className="onboarding-intro">
+            {signupStage === "verification"
+              ? `Enter the verification code sent to ${email}.`
+              : copy.description}
+          </p>
+          <form
+            onSubmit={submit}
+            aria-label={
+              signupStage === "verification"
+                ? "Verify your email address"
+                : copy.title
+            }
+          >
+            {signupStage === "verification" ? (
               <label className="auth-field">
-                <span>Email address</span>
+                <span>Email verification code</span>
                 <input
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  maxLength={254}
-                  required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-              </label>
-            )}
-            {(mode === "signin" || mode === "signup") && (
-              <label className="auth-field">
-                <span>Password</span>
-                <input
-                  name="password"
-                  type="password"
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                  minLength={8}
-                  maxLength={72}
+                  name="token"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]{4,12}"
+                  minLength={4}
+                  maxLength={12}
+                  aria-describedby="signup-code-help"
                   required
                 />
+                <small id="signup-code-help">
+                  Enter the code from your CampusOps confirmation email.
+                </small>
               </label>
-            )}
-            {mode === "reset" && (
+            ) : (
               <>
-                <label className="auth-field">
-                  <span>New password</span>
-                  <input
-                    name="password"
-                    type="password"
-                    autoComplete="new-password"
-                    minLength={8}
-                    maxLength={72}
-                    required
-                  />
-                </label>
-                <label className="auth-field">
-                  <span>Confirm new password</span>
-                  <input
-                    name="confirmPassword"
-                    type="password"
-                    autoComplete="new-password"
-                    minLength={8}
-                    maxLength={72}
-                    required
-                  />
-                </label>
+                {mode === "signup" && (
+                  <>
+                    <label className="auth-field">
+                      <span>Full name</span>
+                      <input
+                        name="fullName"
+                        autoComplete="name"
+                        minLength={2}
+                        maxLength={80}
+                        required
+                      />
+                    </label>
+                    <label className="auth-field">
+                      <span>University</span>
+                      <select name="universityId" defaultValue="oau" required>
+                        <option value="oau">
+                          Obafemi Awolowo University (OAU)
+                        </option>
+                      </select>
+                    </label>
+                    <label className="auth-field">
+                      <span>What are you signing up as?</span>
+                      <select
+                        name="signupIntent"
+                        defaultValue="student"
+                        required
+                      >
+                        <option value="student">Student</option>
+                        <option value="organization_manager">
+                          Organization manager
+                        </option>
+                        <option value="both">Both</option>
+                      </select>
+                      <small>
+                        Manager tools appear only after an organization
+                        provisions an active manager membership. This choice
+                        does not grant access.
+                      </small>
+                    </label>
+                  </>
+                )}
+                {mode !== "reset" && (
+                  <label className="auth-field">
+                    <span>Email address</span>
+                    <input
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      maxLength={254}
+                      required
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                    />
+                  </label>
+                )}
+                {(mode === "signin" || mode === "signup") && (
+                  <label className="auth-field">
+                    <span>Password</span>
+                    <input
+                      name="password"
+                      type="password"
+                      autoComplete={
+                        mode === "signup" ? "new-password" : "current-password"
+                      }
+                      minLength={8}
+                      maxLength={72}
+                      required
+                    />
+                  </label>
+                )}
+                {mode === "reset" && (
+                  <>
+                    <label className="auth-field">
+                      <span>New password</span>
+                      <input
+                        name="password"
+                        type="password"
+                        autoComplete="new-password"
+                        minLength={8}
+                        maxLength={72}
+                        required
+                      />
+                    </label>
+                    <label className="auth-field">
+                      <span>Confirm new password</span>
+                      <input
+                        name="confirmPassword"
+                        type="password"
+                        autoComplete="new-password"
+                        minLength={8}
+                        maxLength={72}
+                        required
+                      />
+                    </label>
+                  </>
+                )}
               </>
             )}
             {notice && (
@@ -321,10 +423,25 @@ export default function AuthPanel({
               className="button button-primary onboarding-submit"
               disabled={busy}
             >
-              {busy ? "Please wait…" : copy.submit}
+              {busy
+                ? "Please wait…"
+                : signupStage === "verification"
+                  ? "Verify email"
+                  : copy.submit}
               {!busy && <Icon name="arrow" size={17} />}
             </button>
-            {((mode === "signup" && notice) || needsConfirmation) && (
+            {signupStage === "verification" && (
+              <button
+                type="button"
+                className="text-button auth-resend"
+                onClick={resendConfirmation}
+                disabled={busy || !email}
+              >
+                {busy ? "Sending…" : "Resend verification code"}
+              </button>
+            )}
+            {(mode === "signup" && signupStage === "form" && notice) ||
+            needsConfirmation ? (
               <button
                 type="button"
                 className="text-button auth-resend"
@@ -333,7 +450,7 @@ export default function AuthPanel({
               >
                 {busy ? "Sending…" : "Resend confirmation email"}
               </button>
-            )}
+            ) : null}
           </form>
           {mode === "signin" && (
             <Link href="/forgot-password" className="auth-secondary-link">

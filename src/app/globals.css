@@ -1614,6 +1614,87 @@ tbody tr:hover {
 .workspace-loading > span:last-child {
   font-size: 12px;
 }
+.signup-transition {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 24px;
+  text-align: center;
+  background: #fff;
+}
+.signup-success-mark {
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #4285f4;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 #4285f440;
+  animation: signup-success-pop 650ms cubic-bezier(0.2, 0.8, 0.2, 1) both,
+    signup-success-pulse 1.8s ease-out 500ms infinite;
+}
+.signup-transition h1 {
+  margin-top: 10px;
+  font-size: clamp(25px, 5vw, 34px);
+  letter-spacing: -1px;
+}
+.signup-transition p {
+  color: var(--muted);
+}
+.signup-loading {
+  position: relative;
+  gap: 13px;
+  background: var(--background);
+}
+.signup-loading .brand-mark {
+  background: var(--indigo);
+  color: #fff;
+}
+.signup-loading strong {
+  color: var(--navy);
+}
+.signup-loading-spinner {
+  width: 24px;
+  height: 24px;
+  margin-top: 3px;
+  border: 2px solid #dcdafc;
+  border-top-color: var(--indigo);
+  border-radius: 50%;
+  animation: signup-spinner 800ms linear infinite;
+}
+@keyframes signup-success-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes signup-success-pulse {
+  0% {
+    box-shadow: 0 0 0 0 #4285f440;
+  }
+  100% {
+    box-shadow: 0 0 0 22px #4285f400;
+  }
+}
+@keyframes signup-spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signup-success-mark,
+  .signup-loading-spinner {
+    animation: none;
+  }
+}
 .mobile-menu,
 .sidebar-backdrop {
   display: none;
