@@ -108,6 +108,9 @@ export default function AuthPanel({
     if (isEmailVerification) {
       body.email = email;
     }
+    if (mode === "reset") {
+      body.token = new URLSearchParams(window.location.search).get("token") ?? "";
+    }
     const endpoint = {
       signup: "/api/auth/sign-up",
       signin: "/api/auth/sign-in",

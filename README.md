@@ -1,30 +1,24 @@
 # CampusOps
 
-CampusOps is a university operations application beginning with an OAU product preview in Nigeria. It connects student organizations, events, programs, tasks, applications, and analytics. Supabase Auth provides account registration, email confirmation, sign-in, password recovery, and server-verified sessions. Operational workspace records remain sample preview data and are not a production data backend.
+CampusOps is a university operations application beginning with an OAU product preview in Nigeria. It connects student organizations, events, programs, tasks, applications, and analytics. A Python FastAPI service handles account registration, email verification, sign-in, password recovery, and sessions. Operational workspace records remain sample preview data and are not a production data backend.
 
 ## Run
 
-Use Node.js 22.18 or later.
+Use Node.js 22.18 or later and Python 3.10 or later.
 
 ```bash
 npm ci
-npm run dev
 ```
 
-Copy `.env.example` to `.env.local`, configure the Supabase project values, and apply the migrations before starting the app:
+Copy `.env.example` to `.env.local` and configure the Resend email values. Resend requires an API key and a verified sender domain. Create the Python environment and start FastAPI:
 
-```bash
-npx supabase login
-npx supabase link --project-ref YOUR_PROJECT_REF
-npx supabase db push
-npm run dev
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements-dev.txt
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload --port 8000 --env-file .env.local
 ```
 
-Open [localhost:3000](http://localhost:3000). Register at [/sign-up](http://localhost:3000/sign-up), or sign in at [/sign-in](http://localhost:3000/sign-in).
-
-In Supabase Auth settings, enable email confirmation and add `http://localhost:3000/auth/callback` to the allowed redirect URLs. For each deployment, set `NEXT_PUBLIC_SITE_URL` to that exact HTTPS origin and allow its `/auth/callback` URL in Supabase. Only use the `sb_publishable_...` key in `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; never put a secret/service-role key in a `NEXT_PUBLIC_` variable. Optional account-deletion email requires a server-only Supabase service-role key and Resend settings. See [Supabase email setup](docs/supabase-email-templates.md) for branded confirmation templates and sender configuration.
-
-If the original auth migration was applied directly in the Supabase SQL Editor, also run the new [signup preference and account-deletion migration](supabase/migrations/20261012150000_signup_intent_and_account_deletion.sql) there. When using the Supabase CLI instead, record the manually applied first migration with `npx supabase migration repair --status applied 20261012120000`, then run `npx supabase db push`.
+In a second terminal run `npm run dev`, then open [localhost:3000](http://localhost:3000). Register at [/sign-up](http://localhost:3000/sign-up), or sign in at [/sign-in](http://localhost:3000/sign-in). See [Python auth setup](docs/python-auth.md) for configuration and local database details.
 
 ## One account, personal and organization workspaces
 
@@ -40,23 +34,13 @@ To try it, apply to **A Greener Campus** in My campus, open your applications, t
 
 ## Authentication and permissions
 
-The registration page asks whether someone is signing up as a student, organization manager, or both. This is saved as an onboarding preference only: Supabase creates a student profile for every public signup, and organization management still requires a provisioned active membership. The selection cannot grant a role. Supabase email confirmation is required before authenticated workspace routes can be opened. Sign-in, sign-out, password recovery, and password reset use same-origin server route handlers. Supabase SSR stores session cookies as HttpOnly, SameSite=Lax cookies (Secure in production); passwords and tokens are not stored in local storage or sent to client code.
+The registration page asks whether someone is signing up as a student, organization manager, or both. This is saved as an onboarding preference only: the Python service creates a student profile for every public signup, and organization management still requires a provisioned active membership. The selection cannot grant a role. Email verification is required before authenticated workspace routes can be opened. Sign-in, sign-out, password recovery, and password reset use FastAPI endpoints behind same-origin Next.js route handlers. Sessions use HttpOnly, SameSite=Lax cookies (Secure for HTTPS); passwords and tokens are not stored in local storage or sent to client code.
 
-`src/app/(workspace)/layout.tsx` verifies the session server-side. The admin page checks the signed-in user's database profile; tasks and analytics require an active organization-manager membership. The profile trigger always creates a student profile and ignores submitted role metadata. Profile and organization-membership RLS allows users to read only their own rows, with no client-side permission to grant roles.
+`src/app/(workspace)/layout.tsx` verifies the session server-side against FastAPI. The admin page checks the signed-in user's database profile; tasks and analytics require an active organization-manager membership. Public signup never grants administrator or manager privileges.
 
-To provision an administrator, first create and verify their account, then run a trusted SQL update in the Supabase SQL editor:
+An active organization-manager membership must be issued through a trusted administrative workflow or invitation. Public signup never grants manager or administrator access. In Settings, a signed-in user can request account deletion; a 30-minute one-time link is sent to their confirmed email and account removal occurs only after a final confirmation on the link page. Account data is stored in the local SQLite database. The existing UI data adapter is still the explicitly labelled local sample preview; do not put real student information in the preview.
 
-```sql
-update public.profiles
-set role = 'admin'
-where id = (
-  select id from auth.users where email = 'admin@example.edu'
-);
-```
-
-An active organization-manager membership must likewise be issued through a trusted administrative workflow or invitation. Public signup never grants manager or administrator access. In Settings, a signed-in user can request account deletion; a 30-minute one-time link is sent to their confirmed email and account removal occurs only after a final confirmation on the link page. Deletion removes Supabase Auth, profile, and membership records, but does not remove local preview data from a browser. The existing UI data adapter is still the explicitly labelled local sample preview; this authentication change does not migrate events, applications, or student data into Supabase. Do not put real student information in the preview.
-
-The workspace UI still uses a preprovisioned sample account. Its local membership data is editable in browser tools and is **not a production authorization boundary**; server route checks rely on Supabase profiles and memberships instead. No real student information belongs in the preview.
+The workspace UI still uses a preprovisioned sample account. Its local membership data is editable in browser tools and is **not a production authorization boundary**; server route checks rely on Python-backed account profiles and memberships instead. No real student information belongs in the preview.
 
 ## Architecture
 

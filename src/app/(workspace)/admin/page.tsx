@@ -1,4 +1,4 @@
-import { requireProfileRole } from "@/lib/supabase/auth";
+import { requireProfileRole } from "@/lib/auth";
 import AdminPage from "@/features/admin/page";
 
 export default async function Page() {

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { requireAuthenticatedUser } from "@/lib/supabase/auth";
+import { requireAuthenticatedUser } from "@/lib/auth";
 
 export default async function WorkspaceLayout({
   children,
