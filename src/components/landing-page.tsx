@@ -211,8 +211,6 @@ export default function LandingPage() {
               <small>One campus. More connection.</small>
             </span>
           </div>
-          <span className="landing-hero-orb landing-orb-one" />
-          <span className="landing-hero-orb landing-orb-two" />
         </div>
       </section>
 

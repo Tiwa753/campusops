@@ -4639,3 +4639,79 @@ textarea:disabled {
     gap: 6px;
   }
 }
+
+.landing-hero {
+  position: relative;
+  isolation: isolate;
+}
+
+.landing-hero::before {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  content: "";
+  transform: translateX(-50%);
+  background:
+    radial-gradient(
+      ellipse at 13% 22%,
+      rgb(165 160 245 / 26%),
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse at 83% 65%,
+      rgb(121 151 224 / 22%),
+      transparent 48%
+    ),
+    radial-gradient(
+      ellipse at 57% 5%,
+      rgb(235 211 248 / 35%),
+      transparent 39%
+    ),
+    linear-gradient(112deg, #fbfbff 4%, #f0efff 48%, #e9edff 76%, #f7f5ff);
+  background-size: 155% 155%;
+  animation: campus-aurora-drift 22s ease-in-out infinite alternate;
+}
+
+.landing-hero::after {
+  position: absolute;
+  z-index: -1;
+  right: 50%;
+  bottom: 0;
+  width: 100vw;
+  height: 1px;
+  content: "";
+  transform: translateX(50%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(91 91 214 / 20%),
+    rgb(165 160 245 / 46%),
+    transparent
+  );
+}
+
+@keyframes campus-aurora-drift {
+  0% {
+    background-position:
+      0% 0%,
+      100% 100%,
+      50% 0%,
+      0% 50%;
+  }
+  100% {
+    background-position:
+      28% 42%,
+      74% 30%,
+      35% 65%,
+      100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero::before {
+    animation: none;
+  }
+}
